@@ -15,6 +15,15 @@ FROM node:${NODE_VERSION}-alpine as base
 # Set working directory for all build stages.
 WORKDIR /usr/src/app
 
+################################################################################
+# Create a stage for development
+FROM base as dev
+COPY package.json package-lock.json* ./
+RUN npm install
+COPY . .
+CMD ['npm','run','dev']
+
+
 
 ################################################################################
 # Create a stage for installing production dependecies.
