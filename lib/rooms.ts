@@ -28,13 +28,15 @@ export async function getQueueRooms() {
     }
 }
 
-export async function insertRoom({ room_id, channel_id }: { room_id: string; channel_id: string }) {
+export async function insertRoom({ room_id, channel_id, agent_id, status }: { room_id: string; channel_id: string; agent_id?: string; status?: Rooms["status"] }) {
     try {
         const inserted = await db
             .insert(roomsTable)
             .values({
                 room_id,
                 channel_id,
+                agent_id,
+                status,
             })
             .returning();
 
@@ -44,13 +46,14 @@ export async function insertRoom({ room_id, channel_id }: { room_id: string; cha
     }
 }
 
-export async function updateRoomStatus({ room_id, status }: { room_id: string; status: Rooms["status"] }) {
+export async function updateRoomStatus({ room_id, agent_id, status }: { room_id: string; agent_id?: string; status: Rooms["status"] }) {
     const updated_at = new Date();
 
     try {
         const updated = await db
             .update(roomsTable)
             .set({
+                agent_id,
                 status,
                 updated_at,
             })
