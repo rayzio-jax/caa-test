@@ -3,6 +3,7 @@ const appConfig = {
     qiscusKey: process.env.QISCUS_KEY!,
     qiscusAppId: process.env.QISCUS_APP_ID!,
     qiscusAdminToken: process.env.QISCUS_ADMIN_TOKEN!,
+    maxCustomers: Number(process.env.AGENT_MAX_CUSTOMERS!),
 };
 
 export default appConfig;
