@@ -10,5 +10,6 @@ declare interface Rooms {
 
 declare type Payload = {
     status: string;
+    message: string;
     payload: any;
 };
