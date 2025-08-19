@@ -13,3 +13,10 @@ declare type Payload = {
     message: string;
     payload: any;
 };
+
+declare interface Agent {
+    id: string;
+    email: string;
+    name: string;
+    customerCount: string | number;
+}
