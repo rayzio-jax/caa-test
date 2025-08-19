@@ -1,77 +1,63 @@
 import appConfig from "@/lib/config";
+import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
 import { getQueueRooms, updateRoomStatus } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
-import axios from "axios";
 
 export async function POST(req: Request) {
     try {
-        const data = await req.json();
-
-        console.log("================MARK AS RESOLVED================");
         const {
             resolved_by: { id: agent_id },
             service: { room_id },
-        } = data;
+        } = await req.json();
 
         const resolved = await updateRoomStatus({ room_id, agent_id, status: "RESOLVED" });
-        console.log(resolved[0]);
+
+        // console.log("================MARK AS RESOLVED================");
+        // console.log(resolved[0]);
 
         const queueRooms: Rooms[] = await getQueueRooms();
 
-        if (queueRooms.length > 0) {
-            console.log("================ON QUEUE ROOMS================");
-            console.log(queueRooms);
-        }
+        // if (queueRooms.length > 0) {
+        //     console.log("================ON QUEUE ROOMS================");
+        //     console.log(queueRooms);
+        // }
 
-        for (let i = 0; i < queueRooms.length; i++) {
-            const res = await axios.get(`${appConfig.qiscusApiURL}/v2/admin/service/available_agents`, {
-                params: {
-                    room_id: queueRooms[0].room_id,
-                },
-                headers: {
-                    Authorization: appConfig.qiscusAdminToken,
-                    "Qiscus-App-Id": appConfig.qiscusAppId,
-                },
-            });
+        const agentLoads: Record<string, number> = {};
 
-            const agents: [any] = res.data.data.agents;
-            const availableAgents = agents
-                .filter((agent) => agent.is_available && agent.current_customer_count < appConfig.maxCustomers)
-                .map(({ id, email, name, current_customer_count }) => ({
-                    id,
-                    email,
-                    name,
-                    customerCount: current_customer_count,
-                }));
+        for (const room of queueRooms) {
+            let availableAgents: Agent[] = [];
+
+            // 🔄 retry up to 3 times (1s, 2s, 3s backoff)
+            for (let attempt = 1; attempt <= 3; attempt++) {
+                availableAgents = await getAvailableAgents({ room_id: room.room_id, agentLoads });
+
+                availableAgents.forEach((agent) => {
+                    if (!(agent.id in agentLoads)) {
+                        agentLoads[agent.id] = Number(agent.customerCount) || 0;
+                    }
+                });
+
+                if (availableAgents.length > 0) break;
+
+                console.log(`No available agents for room ${room.room_id} (attempt ${attempt}), retrying...`);
+                await new Promise((res) => setTimeout(res, attempt * 1000)); // exponential-ish backoff
+            }
 
             if (availableAgents.length > 0) {
-                console.log("================AVAILABLE AGENTS================");
-                console.log(availableAgents);
+                // console.log("================AVAILABLE AGENTS================");
+                // console.log(availableAgents);
 
-                const handledRoomId = queueRooms[0].room_id;
-                const handledAgentId = availableAgents[0].id;
-                await axios.post(
-                    `${appConfig.qiscusApiURL}/v1/admin/service/assign_agent`,
-                    {
-                        room_id: handledRoomId,
-                        agent_id: handledAgentId,
-                        replace_latest_agent: false,
-                        max_agent: 1,
-                    },
-                    {
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Qiscus-Secret-Key": appConfig.qiscusKey,
-                            "Qiscus-App-Id": appConfig.qiscusAppId,
-                        },
-                    }
-                );
+                const assignedAgentId = availableAgents[0].id;
+                await assignAgent({ room_id: room.room_id, agent_id: assignedAgentId });
 
-                const handled = await updateRoomStatus({ room_id: handledRoomId, agent_id, status: "HANDLED" });
-                console.log(`================AGENT ${agent_id} HANDLE ON ROOM ${handledRoomId}================`);
-                console.log(handled[0]);
+                agentLoads[assignedAgentId] = (agentLoads[assignedAgentId] || 0) + 1;
+
+                const handled = await updateRoomStatus({ room_id: room.room_id, agent_id, status: "HANDLED" });
+                // console.log(`================AGENT ${assignedAgentId} HANDLE ON ROOM ${room.room_id}================`);
+                // console.log(handled[0]);
             } else {
-                break;
+                console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
+                continue;
             }
         }
 
