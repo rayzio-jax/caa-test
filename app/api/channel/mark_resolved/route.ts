@@ -10,9 +10,21 @@ export async function POST(req: Request) {
             service: { room_id },
         } = await req.json();
 
-        const canRun = await canDebounced("assign_agents_lock", 3); // 3-second debounce
+        // Debounce with a 3-second lock
+        const lockId = "assign_agents_lock";
+        const debounceMs = 3000;
+
+        // Attempt to acquire lock with retry for the latest request
+        let canRun = false;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+            canRun = await canDebounced(lockId, debounceMs);
+            if (canRun) break;
+            // Wait briefly before retrying to allow the lock to expire
+            await new Promise((res) => setTimeout(res, 100 * attempt));
+        }
+
         if (!canRun) {
-            return responsePayload("ok", "⏳ skipped - debounce lock active", {}, 200);
+            return responsePayload("ok", "⏳ Skipped - debounce lock active", {}, 200);
         }
 
         await resolveRoom(room_id, agent_id);

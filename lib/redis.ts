@@ -12,9 +12,9 @@ export const redis = new Redis(appConfig.redisUrl, {
     retryStrategy: (times) => Math.min(times * 500, 3000),
 });
 
-export async function canDebounced(lockId: string, windowSeconds: number) {
+export async function canDebounced(lockId: string, windwowMs: number) {
     // SET lockId value NX (if not exists) with EX (expire in N seconds)
-    const result = await redis.set(lockId, Date.now(), "PX", windowSeconds, "NX");
+    const result = await redis.set(lockId, Date.now(), "PX", windwowMs, "NX");
 
     // result === "OK" if lock was acquired
     return result === "OK";
