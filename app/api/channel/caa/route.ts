@@ -12,7 +12,7 @@ export async function POST(req: Request) {
         } = await req.json();
 
         const rooms = await getAllRooms();
-        const handledRooms = rooms.filter((room) => String(room.agent_id) === String(candidateAgent.id) && String(room.status) === "HANDLED").length;
+        const handledRooms = rooms.filter((room) => room.agent_id === candidateAgent.id && room.status === "HANDLED").length;
 
         if (candidateAgent && handledRooms < 2) {
             await insertRoom({ roomId: room_id, channelId: channel_id, agentId: candidateAgent.id, status: "HANDLED" });

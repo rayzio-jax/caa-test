@@ -13,7 +13,7 @@ import { redis } from "./redis";
  * @param {Object<string, number>} [params.agentLoads] - Optional map of agent IDs to their current load.
  * @returns {Promise<Agent[]>} A promise that resolves to a list of available agents.
  */
-export const getAvailableAgents = async ({ roomId, agentLoads }: { roomId: string; agentLoads?: Record<string, number> }): Promise<Agent[]> => {
+export const getAvailableAgents = async ({ roomId }: { roomId: number }): Promise<Agent[]> => {
     try {
         const res = await axios.get(`${appConfig.qiscusApiURL}/v2/admin/service/available_agents`, {
             params: {
@@ -61,7 +61,7 @@ export const getAvailableAgents = async ({ roomId, agentLoads }: { roomId: strin
  * @param {string} params.agent_id - The ID of the agent being assigned.
  */
 
-export const assignAgent = async ({ roomId, agentId }: { roomId: string; agentId: string }) => {
+export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId: number }) => {
     try {
         await axios.post(
             `${appConfig.qiscusApiURL}/v1/admin/service/assign_agent`,

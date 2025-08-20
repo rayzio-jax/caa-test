@@ -20,7 +20,7 @@ export async function canDebounced(lockId: string, windwowMs: number) {
     return result === "OK";
 }
 
-export async function tryAssignAgent(roomId: string, candidateAgent: Agent): Promise<boolean> {
+export async function tryAssignAgent(roomId: number, candidateAgent: Agent): Promise<boolean> {
     const agentKey = `agent:${candidateAgent.id}:load`;
 
     const currentLoad = Number(await redis.get(agentKey)) || 0;
@@ -46,7 +46,7 @@ export async function tryAssignAgent(roomId: string, candidateAgent: Agent): Pro
     return true;
 }
 
-export async function resolveRoom(roomId: string, agentId: string) {
+export async function resolveRoom(roomId: number, agentId: number) {
     await updateRoomStatus({ roomId, agentId, status: "RESOLVED" });
 
     const agentKey = `agent:${agentId}:load`;
