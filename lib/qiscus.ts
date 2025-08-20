@@ -3,6 +3,7 @@
 import axios from "axios";
 import appConfig from "./config";
 import { parseStringify } from "./utils";
+import { redis } from "./redis";
 
 /**
  * Gets the list of available agents for a room.
@@ -26,11 +27,15 @@ export const getAvailableAgents = async ({ roomId, agentLoads }: { roomId: strin
 
         const agents: any[] = (await res.data.data.agents) || [];
 
+        // Fetch current loads from Redis
+        const redisKeys = agents.map((agent) => `agent:${agent.id}:load`);
+        const redisCounts = await redis.mget(...redisKeys); // returns array of strings | null
+
         const availableAgents = agents
-            .filter((agent) => {
+            .filter((agent, index) => {
                 const liveCount = Number(agent.current_customer_count) || 0;
-                const localCount = agentLoads?.[agent.id] || 0;
-                const totalCount = liveCount + localCount;
+                const redisCount = Number(redisCounts[index] || 0); // load from Redis
+                const totalCount = liveCount + redisCount;
 
                 return agent.is_available && totalCount < appConfig.maxCustomers;
             })
