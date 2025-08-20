@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
 /** Use to parse value into JSON object */
-export const parseStringify = (value: any) => {
+export function parseStringify<T>(value: T): T {
     return JSON.parse(JSON.stringify(value));
-};
+}
 
 /**
  * Creates a standardized response payload.
