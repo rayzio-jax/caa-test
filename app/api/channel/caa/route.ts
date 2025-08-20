@@ -1,6 +1,6 @@
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
 import { insertRoom } from "@/lib/rooms";
-import { parseStringify, responsePayload } from "@/lib/utils";
+import { responsePayload } from "@/lib/utils";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -11,27 +11,20 @@ export async function POST(req: Request) {
             candidate_agent,
         } = await req.json();
 
-        // console.log("================NEW CUSTOMER================");
-        // console.log(parseStringify({ channel_id, room_id, candidate_agent: { id: candidate_agent.id, name: candidate_agent.name, email: candidate_agent.email } }));
-
+        const agentLoads: Record<string, number> = {};
         const availableAgents = await getAvailableAgents({ room_id });
 
         if (availableAgents.length > 0) {
-            // console.log("================AVAILABLE AGENTS================");
-            // console.log(availableAgents);
+            const assignedAgent = availableAgents[0];
 
-            const assignedAgentId = availableAgents[0].id;
-            await assignAgent({ room_id, agent_id: assignedAgentId });
+            agentLoads[assignedAgent.id] = (agentLoads[assignedAgent.id] || 0) + 1;
 
-            const newRoom = await insertRoom({ room_id, channel_id, agent_id: assignedAgentId, status: "HANDLED" });
-            // console.log("================NEW ROOM================");
-            // console.log(newRoom[0]);
-            return NextResponse.json({ status: "ok", message: `agent ${candidate_agent.email}:${candidate_agent.id}` }, { status: 200 });
+            await assignAgent({ room_id, agent_id: assignedAgent.id });
+            await insertRoom({ room_id, channel_id, agent_id: assignedAgent.id, status: "HANDLED" });
+            return NextResponse.json({ status: "ok", message: `agent ${assignedAgent.email}:${assignedAgent.id}` }, { status: 200 });
         }
 
-        const newRoom = await insertRoom({ room_id, channel_id });
-        // console.log("================NEW ROOM================");
-        // console.log(newRoom[0]);
+        await insertRoom({ room_id, channel_id });
         return NextResponse.json({ status: "ok", message: `no agent assigned, room '${room_id}' is on QUEUE` }, { status: 200 });
     } catch (error) {
         console.error("Failed to fetch agents", error);
