@@ -23,7 +23,7 @@ export const getAvailableAgents = async ({ room_id, agentLoads }: { room_id: str
         },
     });
 
-    const agents: any[] = res.data.data.agents || [];
+    const agents: any[] = (await res.data.data.agents) || [];
 
     const availableAgents = agents
         .filter((agent) => {

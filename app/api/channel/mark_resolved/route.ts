@@ -1,4 +1,3 @@
-import appConfig from "@/lib/config";
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
 import { getQueueRooms, updateRoomStatus } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
@@ -10,17 +9,8 @@ export async function POST(req: Request) {
             service: { room_id },
         } = await req.json();
 
-        const resolved = await updateRoomStatus({ room_id, agent_id, status: "RESOLVED" });
-
-        // console.log("================MARK AS RESOLVED================");
-        // console.log(resolved[0]);
-
+        await updateRoomStatus({ room_id, agent_id, status: "RESOLVED" });
         const queueRooms: Rooms[] = await getQueueRooms();
-
-        // if (queueRooms.length > 0) {
-        //     console.log("================ON QUEUE ROOMS================");
-        //     console.log(queueRooms);
-        // }
 
         const agentLoads: Record<string, number> = {};
 
@@ -44,17 +34,13 @@ export async function POST(req: Request) {
             }
 
             if (availableAgents.length > 0) {
-                // console.log("================AVAILABLE AGENTS================");
-                // console.log(availableAgents);
+                const assignedAgent = availableAgents[0];
+                await assignAgent({ room_id: room.room_id, agent_id: assignedAgent.id });
 
-                const assignedAgentId = availableAgents[0].id;
-                await assignAgent({ room_id: room.room_id, agent_id: assignedAgentId });
+                agentLoads[assignedAgent.id] = (agentLoads[assignedAgent.id] || 0) + 1;
 
-                agentLoads[assignedAgentId] = (agentLoads[assignedAgentId] || 0) + 1;
-
-                const handled = await updateRoomStatus({ room_id: room.room_id, agent_id, status: "HANDLED" });
-                // console.log(`================AGENT ${assignedAgentId} HANDLE ON ROOM ${room.room_id}================`);
-                // console.log(handled[0]);
+                await updateRoomStatus({ room_id: room.room_id, agent_id, status: "HANDLED" });
+                console.log(`✅ Assigned agent ${assignedAgent.id} to room ${room.room_id}`);
             } else {
                 console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
                 continue;
