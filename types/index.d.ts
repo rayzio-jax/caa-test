@@ -18,5 +18,5 @@ declare interface Agent {
     id: string;
     email: string;
     name: string;
-    customerCount: string | number;
+    customerCount: number;
 }
