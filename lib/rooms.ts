@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { roomsTable } from "./schema";
 
@@ -50,19 +50,19 @@ export async function getQueueRooms() {
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
-export async function insertRoom({ room_id, channel_id, agent_id, status }: { room_id: string; channel_id: string; agent_id?: string; status?: Rooms["status"] }): Promise<Rooms[]> {
+export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: string; channelId: string; agentId?: string; status?: Rooms["status"] }): Promise<Rooms[]> {
     try {
         const inserted = await db
             .insert(roomsTable)
             .values({
-                room_id,
-                channel_id,
-                agent_id,
+                room_id: roomId,
+                channel_id: channelId,
+                agent_id: agentId,
                 status,
             })
             .returning();
 
-        return parseStringify(inserted);
+        return parseStringify(inserted) as Rooms[];
     } catch (error) {
         console.error(error);
         return [];
@@ -79,22 +79,23 @@ export async function insertRoom({ room_id, channel_id, agent_id, status }: { ro
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoomStatus({ room_id, agent_id, status }: { room_id: string; agent_id?: string; status: Rooms["status"] }) {
+export async function updateRoomStatus({ roomId, agentId, status }: { roomId: string; agentId?: string; status: Rooms["status"] }): Promise<Rooms[]> {
     const updated_at = new Date();
 
     try {
         const updated = await db
             .update(roomsTable)
             .set({
-                agent_id,
+                agent_id: agentId,
                 status,
                 updated_at,
             })
-            .where(eq(roomsTable.room_id, room_id))
+            .where(and(eq(roomsTable.room_id, roomId), ne(roomsTable.status, status)))
             .returning();
 
-        return parseStringify(updated);
+        return parseStringify(updated) as Rooms[];
     } catch (error) {
         console.error(error);
+        return [];
     }
 }
