@@ -1,5 +1,5 @@
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
-import { insertRoom } from "@/lib/rooms";
+import { getAllRooms, insertRoom } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 import { NextResponse } from "next/server";
 
@@ -7,25 +7,21 @@ export async function POST(req: Request) {
     try {
         const {
             channel: { id: channel_id },
+            candidate_agent: candidateAgent,
             room_id,
-            candidate_agent,
         } = await req.json();
 
-        const agentLoads: Record<string, number> = {};
-        const availableAgents = await getAvailableAgents({ room_id });
+        const rooms = await getAllRooms();
+        const handledRooms = rooms.filter((room) => String(room.agent_id) === String(candidateAgent.id) && String(room.status) === "HANDLED").length;
 
-        if (availableAgents.length > 0) {
-            const assignedAgent = availableAgents[0];
-
-            agentLoads[assignedAgent.id] = (agentLoads[assignedAgent.id] || 0) + 1;
-
-            await assignAgent({ room_id, agent_id: assignedAgent.id });
-            await insertRoom({ room_id, channel_id, agent_id: assignedAgent.id, status: "HANDLED" });
-            return NextResponse.json({ status: "ok", message: `agent ${assignedAgent.email}:${assignedAgent.id}` }, { status: 200 });
+        if (candidateAgent && handledRooms < 2) {
+            await insertRoom({ roomId: room_id, channelId: channel_id, agentId: candidateAgent.id, status: "HANDLED" });
+            await assignAgent({ roomId: room_id, agentId: candidateAgent.id });
+        } else {
+            await insertRoom({ roomId: room_id, channelId: channel_id });
         }
 
-        await insertRoom({ room_id, channel_id });
-        return NextResponse.json({ status: "ok", message: `no agent assigned, room '${room_id}' is on QUEUE` }, { status: 200 });
+        return NextResponse.json({ status: "ok", message: `room '${room_id} has stored with assigned agent ${candidateAgent.id}' is on QUEUE` }, { status: 200 });
     } catch (error) {
         console.error("Failed to fetch agents", error);
         return responsePayload("error", "internal server error, check config", {}, 500);
