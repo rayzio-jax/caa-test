@@ -11,6 +11,7 @@ const appConfig = {
     qiscusKey: process.env.QISCUS_KEY!,
     qiscusAppId: process.env.QISCUS_APP_ID!,
     qiscusAdminToken: process.env.QISCUS_ADMIN_TOKEN!,
+    redisUrl: process.env.REDIS_URL! || "redis://localhost:6379",
     maxCustomers: Number(process.env.AGENT_MAX_CUSTOMERS!),
 };
 
