@@ -1,5 +1,6 @@
+import appConfig from "@/lib/config";
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
-import { canDebounced, resolveRoom, tryAssignAgent } from "@/lib/redis";
+import { canDebounced, redis, resolveRoom, tryAssignAgent } from "@/lib/redis";
 import { getQueueRooms, updateRoomStatus } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
@@ -28,33 +29,44 @@ export async function POST(req: Request) {
         }
 
         await resolveRoom(room_id, agent_id);
-        const queueRooms: Rooms[] = await getQueueRooms();
+        const queueRooms: Room[] = await getQueueRooms();
 
         for (const room of queueRooms) {
-            let availableAgents: Agent[] = [];
+            const availableAgents: Agent[] = await getAvailableAgents({ roomId: room.room_id });
 
-            // 🔄 retry up to 5 times (1s, 2s, 3s -> backoff)
-            for (let attempt = 1; attempt <= 3; attempt++) {
-                availableAgents = await getAvailableAgents({ roomId: room.room_id });
-
-                if (availableAgents.length > 0) break;
-
-                console.log(`No available agents for room ${room.room_id} (attempt ${attempt}), retrying...`);
-                await new Promise((res) => setTimeout(res, attempt * 1000)); // exponential-ish backoff
+            if (availableAgents.length === 0) {
+                console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
+                continue;
             }
 
-            if (availableAgents.length > 0) {
-                const candidateAgent = availableAgents[0];
-                const assigned = await tryAssignAgent(room.room_id, candidateAgent);
+            let assigned = false;
+            const candidateAgent = availableAgents[0];
+            for (const agent of availableAgents) {
+                const agentKey = `agent:${candidateAgent.id}:load`;
 
-                if (!assigned) {
-                    console.log(`❌ Could not assign agent to room ${room.room_id}`);
+                const currentLoad = Number(await redis.get(agentKey)) || 0;
+                const maxCapacity = appConfig.maxCustomers || 2;
+
+                if (currentLoad >= maxCapacity) {
+                    console.log(`Agent ${agent.id} has reached max capacity (${maxCapacity}), skipping...`);
                     continue;
                 }
-            } else {
-                console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
+
+                assigned = await tryAssignAgent(room.room_id, agent);
+                if (assigned) {
+                    console.log(`✅ Assigned room ${room.room_id} to agent ${agent.id}`);
+                    break;
+                } else {
+                    console.log(`❌ Could not assign agent ${agent.id} to room ${room.room_id}`);
+                }
+            }
+
+            if (!assigned) {
+                console.log(`❌ No suitable agents available for room ${room.room_id}`);
             }
         }
+
+        await redis.del(lockId);
 
         return responsePayload("ok", `success mark as resolved room ${room_id}`, {}, 200);
     } catch (error) {
