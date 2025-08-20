@@ -4,6 +4,14 @@ import axios from "axios";
 import appConfig from "./config";
 import { parseStringify } from "./utils";
 
+/**
+ * Gets the list of available agents for a room.
+ *
+ * @param {Object} params - Parameters object.
+ * @param {string} params.room_id - The room ID.
+ * @param {Object<string, number>} [params.agentLoads] - Optional map of agent IDs to their current load.
+ * @returns {Promise<Agent[]>} A promise that resolves to a list of available agents.
+ */
 export const getAvailableAgents = async ({ room_id, agentLoads }: { room_id: string; agentLoads?: Record<string, number> }): Promise<Agent[]> => {
     const res = await axios.get(`${appConfig.qiscusApiURL}/v2/admin/service/available_agents`, {
         params: {
@@ -34,6 +42,14 @@ export const getAvailableAgents = async ({ room_id, agentLoads }: { room_id: str
 
     return parseStringify(availableAgents);
 };
+
+/**
+ * Assigns an agent to a room.
+ *
+ * @param {Object} params - Parameters object.
+ * @param {string} params.room_id - The ID of the room to assign the agent to.
+ * @param {string} params.agent_id - The ID of the agent being assigned.
+ */
 
 export const assignAgent = async ({ room_id, agent_id }: { room_id: string; agent_id: string }) => {
     await axios.post(
