@@ -3,7 +3,7 @@ import appConfig from "./config";
 import { assignAgent } from "./qiscus";
 import { updateRoomStatus } from "./rooms";
 
-const redis = new Redis(appConfig.redisUrl, {
+export const redis = new Redis(appConfig.redisUrl, {
     tls: process.env.REDIS_URL!.startsWith("rediss://") ? {} : undefined,
     reconnectOnError: (err) => {
         console.error("Redis connection error:", err);
@@ -44,4 +44,18 @@ export async function tryAssignAgent(roomId: string, candidateAgent: Agent): Pro
     await updateRoomStatus({ roomId, agentId: candidateAgent.id, status: "HANDLED" });
     console.log(`✅ Assigned agent ${candidateAgent.id} to room ${roomId}`);
     return true;
+}
+
+export async function resolveRoom(roomId: string, agentId: string) {
+    await updateRoomStatus({ roomId, agentId, status: "RESOLVED" });
+
+    const agentKey = `agent:${agentId}:load`;
+
+    const newLoad = await redis.decr(agentKey);
+    if (newLoad < 0) {
+        // safety: never go below 0
+        await redis.set(agentKey, 0);
+    }
+
+    console.log(`🟢 Room ${roomId} resolved, agent ${agentId} load now ${Math.max(newLoad, 0)}`);
 }

@@ -1,5 +1,5 @@
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
-import { canDebounced, tryAssignAgent } from "@/lib/redis";
+import { canDebounced, resolveRoom, tryAssignAgent } from "@/lib/redis";
 import { getQueueRooms, updateRoomStatus } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
@@ -15,23 +15,15 @@ export async function POST(req: Request) {
             return responsePayload("ok", "⏳ skipped - debounce lock active", {}, 200);
         }
 
-        await updateRoomStatus({ roomId: room_id, agentId: agent_id, status: "RESOLVED" });
+        await resolveRoom(room_id, agent_id);
         const queueRooms: Rooms[] = await getQueueRooms();
-
-        const agentLoads: Record<string, number> = {};
 
         for (const room of queueRooms) {
             let availableAgents: Agent[] = [];
 
             // 🔄 retry up to 5 times (1s, 2s, 3s -> backoff)
             for (let attempt = 1; attempt <= 3; attempt++) {
-                availableAgents = await getAvailableAgents({ roomId: room.room_id, agentLoads });
-
-                availableAgents.forEach((agent) => {
-                    if (!(agent.id in agentLoads)) {
-                        agentLoads[agent.id] = Number(agent.customerCount) || 0;
-                    }
-                });
+                availableAgents = await getAvailableAgents({ roomId: room.room_id });
 
                 if (availableAgents.length > 0) break;
 
