@@ -11,9 +11,9 @@ const parseStringify = (values: unknown) => {
 /**
  * Gets the list of all customer rooms
  *
- * @returns {Promise<Rooms[]>} List of rooms
+ * @returns {Promise<Room[]>} List of rooms
  */
-export async function getAllRooms(): Promise<Rooms[]> {
+export async function getAllRooms(): Promise<Room[]> {
     try {
         const rooms = await db.select().from(roomsTable);
 
@@ -27,7 +27,7 @@ export async function getAllRooms(): Promise<Rooms[]> {
 /**
  * Gets the list of all on-queue customer rooms
  *
- * @returns {Promise<Rooms[]>} List of on-queue rooms
+ * @returns {Promise<Room[]>} List of on-queue rooms
  */
 export async function getQueueRooms() {
     try {
@@ -50,7 +50,7 @@ export async function getQueueRooms() {
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
-export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: string; channelId: string; agentId?: string; status?: Rooms["status"] }): Promise<Rooms[]> {
+export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: string; channelId: string; agentId?: string; status?: Room["status"] }): Promise<Room[]> {
     try {
         const inserted = await db
             .insert(roomsTable)
@@ -62,7 +62,7 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
             })
             .returning();
 
-        return parseStringify(inserted) as Rooms[];
+        return parseStringify(inserted) as Room[];
     } catch (error) {
         console.error(error);
         return [];
@@ -79,7 +79,7 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoomStatus({ roomId, agentId, status }: { roomId: string; agentId?: string; status: Rooms["status"] }): Promise<Rooms[]> {
+export async function updateRoomStatus({ roomId, agentId, status }: { roomId: string; agentId?: string; status: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
@@ -93,7 +93,7 @@ export async function updateRoomStatus({ roomId, agentId, status }: { roomId: st
             .where(and(eq(roomsTable.room_id, roomId), ne(roomsTable.status, status)))
             .returning();
 
-        return parseStringify(updated) as Rooms[];
+        return parseStringify(updated) as Room[];
     } catch (error) {
         console.error(error);
         return [];

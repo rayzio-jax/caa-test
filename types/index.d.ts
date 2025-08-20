@@ -1,4 +1,4 @@
-declare interface Rooms {
+declare interface Room {
     id: string;
     room_id: string;
     channel_id: string;
