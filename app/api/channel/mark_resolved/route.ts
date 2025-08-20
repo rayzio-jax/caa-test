@@ -1,5 +1,5 @@
 import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
-import { canDebounced } from "@/lib/redis";
+import { canDebounced, tryAssignAgent } from "@/lib/redis";
 import { getQueueRooms, updateRoomStatus } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
@@ -39,17 +39,16 @@ export async function POST(req: Request) {
                 await new Promise((res) => setTimeout(res, attempt * 1000)); // exponential-ish backoff
             }
 
-            const candidateAgent = availableAgents[0];
-            if (availableAgents.length > 0 && agentLoads[candidateAgent.id] < 2) {
-                await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+            if (availableAgents.length > 0) {
+                const candidateAgent = availableAgents[0];
+                const assigned = await tryAssignAgent(room.room_id, candidateAgent);
 
-                agentLoads[candidateAgent.id] = (agentLoads[candidateAgent.id] || 0) + 1;
-
-                await updateRoomStatus({ roomId: room.room_id, agentId: candidateAgent.id, status: "HANDLED" });
-                console.log(`✅ Assigned agent ${candidateAgent.id} to room ${room.room_id}`);
+                if (!assigned) {
+                    console.log(`❌ Could not assign agent to room ${room.room_id}`);
+                    continue;
+                }
             } else {
                 console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
-                continue;
             }
         }
 
