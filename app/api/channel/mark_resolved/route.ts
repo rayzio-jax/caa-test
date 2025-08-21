@@ -11,6 +11,8 @@ export async function POST(req: Request) {
             service: { room_id },
         } = await req.json();
 
+        await resolveRoom(room_id, agent_id);
+
         // Debounce with a 3-second lock
         const lockId = "assign_agents_lock";
         const debounceMs = 3000;
@@ -28,7 +30,6 @@ export async function POST(req: Request) {
             return responsePayload("ok", "⏳ Skipped - debounce lock active", {}, 200);
         }
 
-        await resolveRoom(room_id, agent_id);
         const queueRooms: Room[] = await getQueueRooms();
 
         for (const room of queueRooms) {
