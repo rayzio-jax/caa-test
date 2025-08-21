@@ -23,7 +23,7 @@ export async function POST(req: Request) {
         console.log(`2️⃣ Total handled rooms: ${handledRooms}`);
 
         if (candidateAgent && handledRooms < maxCustomer) {
-            await tryAssignAgent({ type: "new", roomId: room_id, channelId: channel_id, agent: candidateAgent as Agent });
+            await tryAssignAgent({ type: "new", roomId: room_id, channelId: channel_id, agent: candidateAgent as Agent, maxCust: maxCustomer });
         } else {
             console.log(`⚠️ Agent cannot handle more rooms`);
             await insertRoom({ roomId: room_id, channelId: channel_id });
