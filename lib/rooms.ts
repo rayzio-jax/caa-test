@@ -17,7 +17,7 @@ export async function getAllRooms(): Promise<Room[]> {
     try {
         const rooms = await db.select().from(roomsTable);
 
-        return parseStringify(rooms);
+        return parseStringify(rooms) as Room[];
     } catch (error) {
         console.error(error);
         return [];
@@ -29,13 +29,28 @@ export async function getAllRooms(): Promise<Room[]> {
  *
  * @returns {Promise<Room[]>} List of on-queue rooms
  */
-export async function getQueueRooms() {
+export async function getQueueRooms(): Promise<Room[]> {
     try {
         const rooms = await db.select().from(roomsTable).where(eq(roomsTable.status, "QUEUE"));
 
-        return parseStringify(rooms);
+        return parseStringify(rooms) as Room[];
     } catch (error) {
         console.error(error);
+        return [];
+    }
+}
+
+export async function getHandledRooms(agentId: string): Promise<Room[]> {
+    try {
+        const rooms = await db
+            .select()
+            .from(roomsTable)
+            .where(and(eq(roomsTable.agent_id, agentId), eq(roomsTable.status, "HANDLED")));
+
+        return parseStringify(rooms) as Room[];
+    } catch (error) {
+        console.error(error);
+        return [];
     }
 }
 
@@ -46,7 +61,7 @@ export async function getQueueRooms() {
  * @param {string} params.room_id - Customer room id.
  * @param {string} params.channel_id - Qiscus channel id.
  * @param {string} [params.agent_id] - Optional Qiscus agent id.
- * @param {status} [params.status] - Optional room status. See {@link Rooms.status}.
+ * @param {status} [params.status] - Optional room status. See {@link Room.status}.
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
@@ -75,7 +90,7 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
  * @param {Object} params - Parameters object.
  * @param {string} params.room_id - The ID of the room to update.
  * @param {string} [params.agent_id] - Optional agent ID assigned to the room.
- * @param {Rooms.status} params.status - The new room status. See {@link Rooms.status}.
+ * @param {Rooms.status} params.status - The new room status. See {@link Room.status}.
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
