@@ -11,6 +11,8 @@ export async function POST(req: Request) {
             candidate_agent: candidateAgent,
             room_id,
         } = await req.json();
+        const { searchParams } = new URL(req.url);
+        const maxCustomer: number = Number(searchParams.get("max-customer")) || 2;
 
         const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
 
@@ -20,7 +22,7 @@ export async function POST(req: Request) {
         console.log(`1️⃣ Current ${candidateAgent.id} load: ${currentLoad}`);
         console.log(`2️⃣ Total handled rooms: ${handledRooms}`);
 
-        if (candidateAgent && handledRooms < appConfig.maxCustomers) {
+        if (candidateAgent && handledRooms < maxCustomer) {
             await tryAssignAgent({ type: "new", roomId: room_id, channelId: channel_id, agent: candidateAgent as Agent });
         } else {
             console.log(`⚠️ Agent cannot handle more rooms`);

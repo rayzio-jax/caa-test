@@ -11,6 +11,8 @@ export async function POST(req: Request) {
             resolved_by: { id: agent_id },
             service: { room_id },
         } = await req.json();
+        const { searchParams } = new URL(req.url);
+        const maxCustomer: number = Number(searchParams.get("max-customer")) || 2;
 
         await resolveRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id });
 
@@ -25,7 +27,7 @@ export async function POST(req: Request) {
                 return;
             }
 
-            if (agents.online.length === 0 || handledRooms.length > appConfig.maxCustomers) {
+            if (agents.online.length === 0 || handledRooms.length > maxCustomer) {
                 console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
                 continue;
             }
@@ -35,7 +37,7 @@ export async function POST(req: Request) {
                 const agentKey = `agent:${agent.id}:load`;
 
                 const currentLoad = Number(await redis.get(agentKey)) || 0;
-                const maxCapacity = appConfig.maxCustomers || 2;
+                const maxCapacity = maxCustomer || 2;
 
                 if (currentLoad >= maxCapacity) {
                     console.log(`Agent ${agent.id} has reached max capacity (${maxCapacity}), skipping...`);

@@ -12,12 +12,12 @@ export const redis = new Redis(appConfig.redisUrl, {
     retryStrategy: (times) => Math.min(times * 500, 3000),
 });
 
-export async function tryAssignAgent({ type, roomId, channelId, agent }: { type: "new" | "update"; roomId: string; channelId: string; agent: Agent }): Promise<boolean> {
+export async function tryAssignAgent({ type, roomId, channelId, agent, maxCust = 2 }: { type: "new" | "update"; roomId: string; channelId: string; agent: Agent; maxCust?: number }): Promise<boolean> {
     const agentKey = `agent:${agent.id}:load`;
 
     const currentLoad = Number(await redis.get(agentKey)) || 0;
 
-    if (currentLoad >= appConfig.maxCustomers) {
+    if (currentLoad >= maxCust) {
         await redis.decr(agentKey);
         return false;
     }
