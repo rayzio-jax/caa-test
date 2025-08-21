@@ -1,7 +1,7 @@
 import appConfig from "@/lib/config";
-import { getAvailableAgents } from "@/lib/qiscus";
+import { getAgents } from "@/lib/qiscus";
 import { canDebounced, redis, resolveRoom, tryAssignAgent } from "@/lib/redis";
-import { getQueueRooms } from "@/lib/rooms";
+import { getHandledRooms, getQueueRooms } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
 export async function POST(req: Request) {
@@ -32,17 +32,17 @@ export async function POST(req: Request) {
         const queueRooms: Room[] = await getQueueRooms();
 
         for (const room of queueRooms) {
-            const availableAgents: Agent[] = await getAvailableAgents({ roomId: room.room_id });
+            const agents: Agent[] = await getAgents();
+            const handledRooms: Room[] = await getHandledRooms(agent_id);
 
-            if (availableAgents.length === 0) {
+            if (agents.length === 0 || handledRooms.length > 2) {
                 console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
                 continue;
             }
 
             let assigned = false;
-            const candidateAgent = availableAgents[0];
-            for (const agent of availableAgents) {
-                const agentKey = `agent:${candidateAgent.id}:load`;
+            for (const agent of agents) {
+                const agentKey = `agent:${agent.id}:load`;
 
                 const currentLoad = Number(await redis.get(agentKey)) || 0;
                 const maxCapacity = appConfig.maxCustomers || 2;
@@ -52,9 +52,8 @@ export async function POST(req: Request) {
                     continue;
                 }
 
-                assigned = await tryAssignAgent(room.room_id, agent);
+                assigned = await tryAssignAgent("update", room.room_id, agent.id);
                 if (assigned) {
-                    console.log(`✅ Assigned room ${room.room_id} to agent ${agent.id}`);
                     break;
                 } else {
                     console.log(`❌ Could not assign agent ${agent.id} to room ${room.room_id}`);

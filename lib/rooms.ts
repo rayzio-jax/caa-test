@@ -40,6 +40,12 @@ export async function getQueueRooms(): Promise<Room[]> {
     }
 }
 
+/**
+ * Gets the list of all handled customer rooms
+ *
+ * @param {string} agentId - Id of agent that handle the room
+ * @returns {Promise<Room[]>} List of handled rooms
+ */
 export async function getHandledRooms(agentId: string): Promise<Room[]> {
     try {
         const rooms = await db

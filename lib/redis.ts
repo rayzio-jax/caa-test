@@ -1,7 +1,7 @@
 import Redis from "ioredis";
 import appConfig from "./config";
 import { assignAgent } from "./qiscus";
-import { updateRoomStatus } from "./rooms";
+import { insertRoom, updateRoomStatus } from "./rooms";
 
 export const redis = new Redis(appConfig.redisUrl, {
     tls: process.env.REDIS_URL!.startsWith("rediss://") ? {} : undefined,
@@ -20,29 +20,30 @@ export async function canDebounced(lockId: string, windwowMs: number) {
     return result === "OK";
 }
 
-export async function tryAssignAgent(roomId: string, candidateAgent: Agent): Promise<boolean> {
-    const agentKey = `agent:${candidateAgent.id}:load`;
+export async function tryAssignAgent(type: "new" | "update", roomId: string, agentId: string, channelId?: string): Promise<boolean> {
+    const agentKey = `agent:${agentId}:load`;
 
     const currentLoad = Number(await redis.get(agentKey)) || 0;
 
     if (currentLoad >= appConfig.maxCustomers) {
-        console.log(`⚠️ Agent ${candidateAgent.id} is at capacity (${currentLoad}), skipping...`);
-        return false;
-    }
-
-    // Atomically increment in Redis
-    const newLoad = await redis.incr(agentKey);
-
-    if (newLoad > appConfig.maxCustomers) {
-        // rollback if we overshot
         await redis.decr(agentKey);
-        console.log(`⚠️ Agent ${candidateAgent.id} reached max capacity, rolled back`);
         return false;
     }
 
-    await assignAgent({ roomId, agentId: candidateAgent.id });
-    await updateRoomStatus({ roomId, agentId: candidateAgent.id, status: "HANDLED" });
-    console.log(`✅ Assigned agent ${candidateAgent.id} to room ${roomId}`);
+    await redis.incr(agentKey);
+
+    if (type === "new") {
+        await assignAgent({ roomId, agentId });
+        await insertRoom({ roomId, channelId: channelId as string, agentId, status: "HANDLED" });
+        console.log(`✅ Assigned agent ${agentId} to room ${roomId}`);
+    } else if (type === "update") {
+        await assignAgent({ roomId, agentId: agentId });
+        await updateRoomStatus({ roomId, agentId, status: "HANDLED" });
+        console.log(`✅ Assigned agent ${agentId} to room ${roomId}`);
+    } else {
+        console.log(`⚠️ Agent ${agentId} has reached max capacity (${currentLoad})`);
+    }
+
     return true;
 }
 

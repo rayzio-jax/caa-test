@@ -1,5 +1,6 @@
-import { assignAgent, getAvailableAgents } from "@/lib/qiscus";
-import { getAllRooms, insertRoom } from "@/lib/rooms";
+import appConfig from "@/lib/config";
+import { redis, tryAssignAgent } from "@/lib/redis";
+import { getHandledRooms, insertRoom } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 import { NextResponse } from "next/server";
 
@@ -11,13 +12,18 @@ export async function POST(req: Request) {
             room_id,
         } = await req.json();
 
-        const rooms = await getAllRooms();
-        const handledRooms = rooms.filter((room) => String(room.agent_id) === String(candidateAgent.id) && String(room.status) === "HANDLED").length;
+        const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
 
-        if (candidateAgent && handledRooms < 2) {
-            await insertRoom({ roomId: room_id, channelId: channel_id, agentId: candidateAgent.id, status: "HANDLED" });
-            await assignAgent({ roomId: room_id, agentId: candidateAgent.id });
+        const agentKey = `agent:${candidateAgent.id}:load`;
+
+        const currentLoad = Number(await redis.get(agentKey)) || 0;
+        console.log("Current load:", currentLoad);
+        console.log("Total handled rooms:", handledRooms);
+
+        if (candidateAgent && handledRooms < appConfig.maxCustomers) {
+            await tryAssignAgent("new", room_id, candidateAgent.id, channel_id);
         } else {
+            console.log("Agent cannot handle more rooms");
             await insertRoom({ roomId: room_id, channelId: channel_id });
         }
 
