@@ -20,8 +20,8 @@ export async function canDebounced(lockId: string, windwowMs: number) {
     return result === "OK";
 }
 
-export async function tryAssignAgent(type: "new" | "update", roomId: string, agentId: string, channelId?: string): Promise<boolean> {
-    const agentKey = `agent:${agentId}:load`;
+export async function tryAssignAgent({ type, roomId, channelId, agent }: { type: "new" | "update"; roomId: string; channelId: string; agent: Agent }): Promise<boolean> {
+    const agentKey = `agent:${agent.id}:load`;
 
     const currentLoad = Number(await redis.get(agentKey)) || 0;
 
@@ -33,22 +33,22 @@ export async function tryAssignAgent(type: "new" | "update", roomId: string, age
     await redis.incr(agentKey);
 
     if (type === "new") {
-        await assignAgent({ roomId, agentId });
-        await insertRoom({ roomId, channelId: channelId as string, agentId, status: "HANDLED" });
-        console.log(`✅ Assigned agent ${agentId} to room ${roomId}`);
+        await assignAgent({ roomId, agentId: agent.id });
+        await insertRoom({ roomId, channelId, agentId: agent.id, status: "HANDLED" });
+        console.log(`✅ Assigned agent ${agent.id} to room ${roomId}`);
     } else if (type === "update") {
-        await assignAgent({ roomId, agentId: agentId });
-        await updateRoomStatus({ roomId, agentId, status: "HANDLED" });
-        console.log(`✅ Assigned agent ${agentId} to room ${roomId}`);
+        await assignAgent({ roomId, agentId: agent.id });
+        await updateRoomStatus({ roomId, channelId, agentId: agent.id, status: "HANDLED" });
+        console.log(`✅ Assigned agent ${agent.id} to room ${roomId}`);
     } else {
-        console.log(`⚠️ Agent ${agentId} has reached max capacity (${currentLoad})`);
+        console.log(`⚠️ Agent ${agent.id} has reached max capacity (${currentLoad})`);
     }
 
     return true;
 }
 
-export async function resolveRoom(roomId: string, agentId: string) {
-    await updateRoomStatus({ roomId, agentId, status: "RESOLVED" });
+export async function resolveRoom({ roomId, channelId, agentId }: { roomId: string; channelId: string; agentId: string }) {
+    await updateRoomStatus({ roomId, channelId, agentId, status: "RESOLVED" });
 
     const agentKey = `agent:${agentId}:load`;
 
@@ -59,4 +59,16 @@ export async function resolveRoom(roomId: string, agentId: string) {
     }
 
     console.log(`🟢 Room ${roomId} resolved, agent ${agentId} load now ${Math.max(newLoad, 0)}`);
+}
+
+export async function resetAgentLoad(agentId: string): Promise<void> {
+    const agentKey = `agent:${agentId}:load`;
+
+    try {
+        await redis.set(agentKey, 0);
+        console.log(`🟢 Agent ${agentId} load reset to 0`);
+    } catch (error) {
+        console.error(`❌ Failed to reset load for agent ${agentId}:`, error);
+        throw error; // Re-throw to allow calling code to handle the error
+    }
 }

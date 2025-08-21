@@ -17,13 +17,13 @@ export async function POST(req: Request) {
         const agentKey = `agent:${candidateAgent.id}:load`;
 
         const currentLoad = Number(await redis.get(agentKey)) || 0;
-        console.log("Current load:", currentLoad);
-        console.log("Total handled rooms:", handledRooms);
+        console.log(`1️⃣ Current ${candidateAgent.id} load: ${currentLoad}`);
+        console.log(`2️⃣ Total handled rooms: ${handledRooms}`);
 
         if (candidateAgent && handledRooms < appConfig.maxCustomers) {
-            await tryAssignAgent("new", room_id, candidateAgent.id, channel_id);
+            await tryAssignAgent({ type: "new", roomId: room_id, channelId: channel_id, agent: candidateAgent as Agent });
         } else {
-            console.log("Agent cannot handle more rooms");
+            console.log(`⚠️ Agent cannot handle more rooms`);
             await insertRoom({ roomId: room_id, channelId: channel_id });
         }
 

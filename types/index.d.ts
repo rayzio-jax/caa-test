@@ -18,4 +18,8 @@ declare interface Agent {
     id: string;
     email: string;
     name: string;
+    user_channels: {
+        id: string;
+        name: string;
+    }[];
 }

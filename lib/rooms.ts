@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { roomsTable } from "./schema";
 
@@ -29,9 +29,13 @@ export async function getAllRooms(): Promise<Room[]> {
  *
  * @returns {Promise<Room[]>} List of on-queue rooms
  */
-export async function getQueueRooms(): Promise<Room[]> {
+export async function getQueueRoomsByChannel(channelId: string): Promise<Room[]> {
     try {
-        const rooms = await db.select().from(roomsTable).where(eq(roomsTable.status, "QUEUE"));
+        const rooms = await db
+            .select()
+            .from(roomsTable)
+            .where(and(eq(roomsTable.channel_id, channelId), eq(roomsTable.status, "QUEUE")))
+            .orderBy(asc(roomsTable.created_at));
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -64,9 +68,9 @@ export async function getHandledRooms(agentId: string): Promise<Room[]> {
  * Insert a new room into queue list
  *
  * @param {Object} params - Parameters object.
- * @param {string} params.room_id - Customer room id.
- * @param {string} params.channel_id - Qiscus channel id.
- * @param {string} [params.agent_id] - Optional Qiscus agent id.
+ * @param {string} params.roomId - Customer room id.
+ * @param {string} params.channelId - Qiscus channel id.
+ * @param {string} [params.agentId] - Optional Qiscus agent id.
  * @param {status} [params.status] - Optional room status. See {@link Room.status}.
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
@@ -94,13 +98,14 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
  * Update the status of a room by its ID.
  *
  * @param {Object} params - Parameters object.
- * @param {string} params.room_id - The ID of the room to update.
+ * @param {string} params.roomId - The ID of the room to update.
+ * @param {string} params.status - The new room status. See {@link Room.status}.
+ * @param {string} params.channelId - The room's channel.
  * @param {string} [params.agent_id] - Optional agent ID assigned to the room.
- * @param {Rooms.status} params.status - The new room status. See {@link Room.status}.
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoomStatus({ roomId, agentId, status }: { roomId: string; agentId?: string; status: Room["status"] }): Promise<Room[]> {
+export async function updateRoomStatus({ roomId, status, channelId, agentId }: { roomId: string; status: Room["status"]; channelId: string; agentId?: string }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
@@ -111,7 +116,7 @@ export async function updateRoomStatus({ roomId, agentId, status }: { roomId: st
                 status,
                 updated_at,
             })
-            .where(and(eq(roomsTable.room_id, roomId), ne(roomsTable.status, status)))
+            .where(and(eq(roomsTable.room_id, roomId), eq(roomsTable.channel_id, channelId), ne(roomsTable.status, status)))
             .returning();
 
         return parseStringify(updated) as Room[];

@@ -1,21 +1,22 @@
 import appConfig from "@/lib/config";
 import { getAgents } from "@/lib/qiscus";
-import { canDebounced, redis, resolveRoom, tryAssignAgent } from "@/lib/redis";
-import { getHandledRooms, getQueueRooms } from "@/lib/rooms";
+import { canDebounced, redis, resetAgentLoad, resolveRoom, tryAssignAgent } from "@/lib/redis";
+import { getHandledRooms, getQueueRoomsByChannel } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
 export async function POST(req: Request) {
     try {
         const {
+            channel: { id: channel_id },
             resolved_by: { id: agent_id },
             service: { room_id },
         } = await req.json();
 
-        await resolveRoom(room_id, agent_id);
+        await resolveRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id });
 
         // Debounce with a 3-second lock
         const lockId = "assign_agents_lock";
-        const debounceMs = 3000;
+        const debounceMs = 10000;
 
         // Attempt to acquire lock with retry for the latest request
         let canRun = false;
@@ -23,26 +24,31 @@ export async function POST(req: Request) {
             canRun = await canDebounced(lockId, debounceMs);
             if (canRun) break;
             // Wait briefly before retrying to allow the lock to expire
-            await new Promise((res) => setTimeout(res, 100 * attempt));
+            await new Promise((res) => setTimeout(res, 1000 * attempt));
         }
 
         if (!canRun) {
             return responsePayload("ok", "⏳ Skipped - debounce lock active", {}, 200);
         }
 
-        const queueRooms: Room[] = await getQueueRooms();
+        const queueRooms: Room[] = await getQueueRoomsByChannel(channel_id);
 
         for (const room of queueRooms) {
-            const agents: Agent[] = await getAgents();
+            const agents = await getAgents();
             const handledRooms: Room[] = await getHandledRooms(agent_id);
 
-            if (agents.length === 0 || handledRooms.length > 2) {
+            if (agents.offline.find((agent) => agent.id === agent_id)) {
+                await resetAgentLoad(agent_id);
+                return;
+            }
+
+            if (agents.online.length === 0 || handledRooms.length > appConfig.maxCustomers) {
                 console.log(`❌ No agents available for room ${room.room_id}, skipping...`);
                 continue;
             }
 
             let assigned = false;
-            for (const agent of agents) {
+            for (const agent of agents.online) {
                 const agentKey = `agent:${agent.id}:load`;
 
                 const currentLoad = Number(await redis.get(agentKey)) || 0;
@@ -53,9 +59,9 @@ export async function POST(req: Request) {
                     continue;
                 }
 
-                assigned = await tryAssignAgent("update", room.room_id, agent.id);
+                assigned = await tryAssignAgent({ type: "update", roomId: room.room_id, channelId: channel_id, agent });
                 if (assigned) {
-                    break;
+                    return responsePayload("ok", `success re-assigned agent ${agent.id} to room ${room_id}`, {}, 200);
                 } else {
                     console.log(`❌ Could not assign agent ${agent.id} to room ${room.room_id}`);
                 }
@@ -67,7 +73,6 @@ export async function POST(req: Request) {
         }
 
         await redis.del(lockId);
-
         return responsePayload("ok", `success mark as resolved room ${room_id}`, {}, 200);
     } catch (error) {
         console.error("Failed to mark resolved room", error);
