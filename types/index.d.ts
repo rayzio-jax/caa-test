@@ -1,8 +1,8 @@
 declare interface Room {
     id: string;
-    room_id: number;
-    channel_id: number;
-    agent_id?: number;
+    room_id: string;
+    channel_id: string;
+    agent_id?: string;
     status: "QUEUE" | "HANDLED" | "RESOLVED";
     created_at: Date;
     updated_at: Date;
@@ -15,7 +15,7 @@ declare type Payload = {
 };
 
 declare interface Agent {
-    id: number;
+    id: string;
     email: string;
     name: string;
     customerCount: number;

@@ -50,7 +50,7 @@ export async function getQueueRooms() {
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
-export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: number; channelId: number; agentId?: number; status?: Room["status"] }): Promise<Room[]> {
+export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: string; channelId: string; agentId?: string; status?: Room["status"] }): Promise<Room[]> {
     try {
         const inserted = await db
             .insert(roomsTable)
@@ -79,7 +79,7 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoomStatus({ roomId, agentId, status }: { roomId: number; agentId?: number; status: Room["status"] }): Promise<Room[]> {
+export async function updateRoomStatus({ roomId, agentId, status }: { roomId: string; agentId?: string; status: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
