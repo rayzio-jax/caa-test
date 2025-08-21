@@ -1,6 +1,6 @@
 import appConfig from "@/lib/config";
 import { getAgents } from "@/lib/qiscus";
-import { canDebounced, redis, resetAgentLoad, resolveRoom, tryAssignAgent } from "@/lib/redis";
+import { redis, resetAgentLoad, resolveRoom, tryAssignAgent } from "@/lib/redis";
 import { getHandledRooms, getQueueRoomsByChannel } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 
@@ -13,23 +13,6 @@ export async function POST(req: Request) {
         } = await req.json();
 
         await resolveRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id });
-
-        // Debounce with a 3-second lock
-        const lockId = "assign_agents_lock";
-        const debounceMs = 10000;
-
-        // Attempt to acquire lock with retry for the latest request
-        let canRun = false;
-        for (let attempt = 1; attempt <= 3; attempt++) {
-            canRun = await canDebounced(lockId, debounceMs);
-            if (canRun) break;
-            // Wait briefly before retrying to allow the lock to expire
-            await new Promise((res) => setTimeout(res, 1000 * attempt));
-        }
-
-        if (!canRun) {
-            return responsePayload("ok", "⏳ Skipped - debounce lock active", {}, 200);
-        }
 
         const queueRooms: Room[] = await getQueueRoomsByChannel(channel_id);
 
@@ -72,7 +55,6 @@ export async function POST(req: Request) {
             }
         }
 
-        await redis.del(lockId);
         return responsePayload("ok", `success mark as resolved room ${room_id}`, {}, 200);
     } catch (error) {
         console.error("Failed to mark resolved room", error);
