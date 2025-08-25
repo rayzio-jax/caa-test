@@ -1,8 +1,8 @@
 declare interface Room {
     id: string;
-    room_id: string;
-    channel_id: string;
-    agent_id?: string;
+    room_id: number;
+    channel_id: number;
+    agent_id?: number;
     status: "QUEUE" | "HANDLED" | "RESOLVED";
     created_at: Date;
     updated_at: Date;
@@ -20,7 +20,7 @@ declare interface FilteredAgents {
 }
 
 declare interface Agent {
-    id: string;
+    id: number;
     email: string;
     name: string;
     current_customer_count: number;
