@@ -20,18 +20,18 @@ export async function POST(req: Request) {
         }
 
         const { online } = await getFilteredAgents();
-        const candidateAgentId = online.agents[0].id;
-        const handledRooms = (await getHandledRooms(candidateAgentId)).length;
+        const candidateAgent = online.agents[0];
+        const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
         const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-        console.log(`❗ Current ${candidateAgentId} load: ${handledRooms}`);
+        console.log(`❗ Current ${candidateAgent.id} load: ${handledRooms}`);
 
-        if (online.count > 0 && candidateAgentId && handledRooms < MAX_CUSTOMER) {
-            const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgentId, roomStatus: "HANDLED" });
+        if ((online.count > 0 && candidateAgent && candidateAgent.current_customer_count < MAX_CUSTOMER) || handledRooms < MAX_CUSTOMER) {
+            const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
 
             if (room) {
-                await assignAgent({ roomId: room_id, agentId: candidateAgentId });
-                console.log(`❗ Current ${candidateAgentId} load: ${handledRooms + 1}`);
+                await assignAgent({ roomId: room_id, agentId: candidateAgent.id });
+                console.log(`❗ Current ${candidateAgent.id} load: ${handledRooms + 1}`);
             }
         } else {
             console.log(`⚠️ Agent cannot handle more rooms`);
