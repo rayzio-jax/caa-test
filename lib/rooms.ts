@@ -2,7 +2,7 @@
 
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "./db";
-import { roomsTable } from "./schema";
+import { TbRooms } from "./schema";
 
 const parseStringify = (values: unknown) => {
     return JSON.parse(JSON.stringify(values));
@@ -13,9 +13,15 @@ const parseStringify = (values: unknown) => {
  *
  * @returns {Promise<Room[]>} List of rooms
  */
-export async function getAllRooms(): Promise<Room[]> {
+export async function getRooms(): Promise<Room[]> {
     try {
-        const rooms = await db.select().from(roomsTable);
+        const rooms = await db
+            .select()
+            .from(TbRooms)
+            .catch((err) => {
+                console.error("Failed to get all room.");
+                throw err;
+            });
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -27,15 +33,20 @@ export async function getAllRooms(): Promise<Room[]> {
 /**
  * Gets the list of all on-queue customer rooms
  *
+ * @param {string} channelId - The chat room channel id
  * @returns {Promise<Room[]>} List of on-queue rooms
  */
-export async function getQueueRoomsByChannel(channelId: string): Promise<Room[]> {
+export async function getQueueRoomsByChannelId(channelId: string): Promise<Room[]> {
     try {
         const rooms = await db
             .select()
-            .from(roomsTable)
-            .where(and(eq(roomsTable.channel_id, channelId), eq(roomsTable.status, "QUEUE")))
-            .orderBy(asc(roomsTable.created_at));
+            .from(TbRooms)
+            .where(and(eq(TbRooms.channel_id, channelId), eq(TbRooms.status, "QUEUE")))
+            .orderBy(asc(TbRooms.created_at))
+            .catch((err) => {
+                console.error(`Failed to get rooms with status "QUEUE"${channelId && ` on channel ${channelId}`}.`);
+                throw err;
+            });
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -54,8 +65,12 @@ export async function getHandledRooms(agentId: string): Promise<Room[]> {
     try {
         const rooms = await db
             .select()
-            .from(roomsTable)
-            .where(and(eq(roomsTable.agent_id, agentId), eq(roomsTable.status, "HANDLED")));
+            .from(TbRooms)
+            .where(and(eq(TbRooms.agent_id, agentId), eq(TbRooms.status, "HANDLED")))
+            .catch((err) => {
+                console.error('Failed to get rooms with status "HANDLED".');
+                throw err;
+            });
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -70,22 +85,22 @@ export async function getHandledRooms(agentId: string): Promise<Room[]> {
  * @param {Object} params - Parameters object.
  * @param {string} params.roomId - Customer room id.
  * @param {string} params.channelId - Qiscus channel id.
- * @param {string} [params.agentId] - Optional Qiscus agent id.
- * @param {status} [params.status] - Optional room status. See {@link Room.status}.
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
-export async function insertRoom({ roomId, channelId, agentId, status }: { roomId: string; channelId: string; agentId?: string; status?: Room["status"] }): Promise<Room[]> {
+export async function addNewRoom({ roomId, channelId }: { roomId: string; channelId: string }): Promise<Room[]> {
     try {
         const inserted = await db
-            .insert(roomsTable)
+            .insert(TbRooms)
             .values({
                 room_id: roomId,
                 channel_id: channelId,
-                agent_id: agentId,
-                status,
             })
-            .returning();
+            .returning()
+            .catch((err) => {
+                console.error("Failed adding new room to database. Missing required values or internal error.");
+                throw err;
+            });
 
         return parseStringify(inserted) as Room[];
     } catch (error) {
@@ -99,25 +114,29 @@ export async function insertRoom({ roomId, channelId, agentId, status }: { roomI
  *
  * @param {Object} params - Parameters object.
  * @param {string} params.roomId - The ID of the room to update.
- * @param {string} params.status - The new room status. See {@link Room.status}.
  * @param {string} params.channelId - The room's channel.
- * @param {string} [params.agent_id] - Optional agent ID assigned to the room.
+ * @param {string} params.agentId - Optional agent ID assigned to the room.
+ * @param {status} params.roomStatus - Optional room status. See Room["status"].
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoomStatus({ roomId, status, channelId, agentId }: { roomId: string; status: Room["status"]; channelId: string; agentId?: string }): Promise<Room[]> {
+export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: string; channelId: string; agentId: string; roomStatus: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
         const updated = await db
-            .update(roomsTable)
+            .update(TbRooms)
             .set({
                 agent_id: agentId,
-                status,
+                status: roomStatus,
                 updated_at,
             })
-            .where(and(eq(roomsTable.room_id, roomId), eq(roomsTable.channel_id, channelId), ne(roomsTable.status, status)))
-            .returning();
+            .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId), ne(TbRooms.status, roomStatus)))
+            .returning()
+            .catch((err) => {
+                console.error(`Failed to update room. Missing required values or internal error.`);
+                throw err;
+            });
 
         return parseStringify(updated) as Room[];
     } catch (error) {
