@@ -9,19 +9,21 @@ export async function POST(req: Request) {
     try {
         const {
             channel: { id: channel_id },
-            resolved_by: { id: agent_id },
+            resolved_by: { id: agent_id, name: agent_name },
             service: { room_id },
         } = await req.json();
 
         await updateRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id, roomStatus: "RESOLVED" });
 
-        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
-        const handledRooms = (await getHandledRooms(agent_id)).length;
         const { online } = await getFilteredAgents();
+        const candidateAgent = online.agents[0];
+        const handledRooms = (await getHandledRooms(agent_id)).length;
+        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-        if ((online.count > 0 && queueRooms.length > 0 && online.agents[0] && online.agents[0].current_customer_count < MAX_CUSTOMER) || handledRooms < MAX_CUSTOMER) {
-            await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: agent_id, roomStatus: "HANDLED" });
-            await assignAgent({ agentId: agent_id, roomId: queueRooms[0].room_id });
+        if (handledRooms < MAX_CUSTOMER && queueRooms.length > 0 && candidateAgent) {
+            const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            await assignAgent({ agentId: Number(room[0].agent_id), roomId: room[0].room_id });
+            console.log(`✅ ${room_id} resolved by ${agent_id}/${agent_name}`);
         }
 
         return responsePayload("ok", `success mark as resolved room ${room_id}`, {}, 200);
