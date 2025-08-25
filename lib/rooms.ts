@@ -41,7 +41,7 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
         const rooms = await db
             .select()
             .from(TbRooms)
-            .where(and(eq(TbRooms.channel_id, String(channelId)), eq(TbRooms.status, "QUEUE")))
+            .where(and(eq(TbRooms.channel_id, channelId.toString()), eq(TbRooms.status, "QUEUE")))
             .orderBy(asc(TbRooms.created_at))
             .catch((err) => {
                 console.error(`Failed to get rooms with status "QUEUE"${channelId && ` on channel ${channelId}`}.`);
@@ -66,7 +66,7 @@ export async function getHandledRooms(agentId: number): Promise<Room[]> {
         const rooms = await db
             .select()
             .from(TbRooms)
-            .where(and(eq(TbRooms.agent_id, String(agentId)), eq(TbRooms.status, "HANDLED")))
+            .where(and(eq(TbRooms.agent_id, agentId.toString()), eq(TbRooms.status, "HANDLED")))
             .catch((err) => {
                 console.error('Failed to get rooms with status "HANDLED".');
                 throw err;
@@ -93,8 +93,8 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
         const inserted = await db
             .insert(TbRooms)
             .values({
-                room_id: String(roomId),
-                channel_id: String(channelId),
+                room_id: roomId.toString(),
+                channel_id: channelId.toString(),
             })
             .returning()
             .catch((err) => {
@@ -131,7 +131,7 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
                 status: roomStatus,
                 updated_at,
             })
-            .where(and(eq(TbRooms.room_id, String(roomId)), eq(TbRooms.channel_id, String(roomId)), ne(TbRooms.status, roomStatus)))
+            .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString()), ne(TbRooms.status, roomStatus)))
             .returning()
             .catch((err) => {
                 console.error(`Failed to update room. Missing required values or internal error.`);
