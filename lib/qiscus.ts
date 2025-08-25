@@ -1,36 +1,50 @@
 "use server";
 
-import axios from "axios";
 import appConfig from "./config";
 import { parseStringify } from "./utils";
+
+const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
 /**
  * Gets the list of available agents for a room.
  *
  * @returns {Promise<{ online: Agent[]; offline: Agent[] }>} A promise that resolves to a list of available agents.
  */
-export const getAgents = async (): Promise<{ online: Agent[]; offline: Agent[] }> => {
+export const getAgents = async (): Promise<{ data?: any[]; errors?: any; status?: number; meta?: any }> => {
     try {
-        const res = await axios
-            .get(`${appConfig.qiscusApiURL}/v2/admin/agents`, {
-                headers: {
-                    "Qiscus-Secret-Key": appConfig.qiscusKey,
-                    "Qiscus-App-Id": appConfig.qiscusAppId,
-                },
-            })
-            .then((raw) => raw.data);
+        const res = await fetch(`${appConfig.apiUrl}/v2/admin/agents/by_division?division_ids[]=${appConfig.agentDivisionId}`, {
+            method: "GET",
+            headers: {
+                "Qiscus-Secret-Key": appConfig.secretKey,
+                "Qiscus-App-Id": appConfig.appId,
+            },
+            next: {
+                revalidate: 60,
+            },
+        }).then((raw) => raw.json());
 
-        const agents: any[] = (await res.data.agents) || [];
-        const availableAgents: Agent[] = agents.filter((agent) => agent.is_available);
-        const unavailableAgents: Agent[] = agents.filter((agent) => !agent.is_available);
-
-        return parseStringify({
-            online: availableAgents,
-            offline: unavailableAgents,
-        });
+        return parseStringify(res);
     } catch (error) {
         console.error(error, "Failed to fetch available agents");
-        return { online: [], offline: [] };
+        return { errors: error, status: 500 };
+    }
+};
+
+export const getFilteredAgents = async (): Promise<FilteredAgents> => {
+    try {
+        const agents = await getAgents();
+
+        if (!agents.data) {
+            return { online: { agents: [], count: 0 }, offline: { agents: [], count: 0 } };
+        }
+
+        const onlineAgents = agents.data.filter((agent) => agent.is_available && agent.current_customer_count < MAX_CUSTOMER);
+        const offlineAgents = agents.data.filter((agent) => !agent.is_available);
+
+        return { online: { agents: onlineAgents, count: onlineAgents.length }, offline: { agents: offlineAgents, count: offlineAgents.length } };
+    } catch (error) {
+        console.error("Failed to get filtered agents");
+        return { online: { agents: [], count: 0 }, offline: { agents: [], count: 0 } };
     }
 };
 
@@ -46,23 +60,21 @@ export const assignAgent = async ({ roomId, agentId }: { roomId: string; agentId
     try {
         if (!roomId || !agentId) throw new Error("roomId or agentId is empty.");
 
-        await axios
-            .post(
-                `${appConfig.qiscusApiURL}/v1/admin/service/assign_agent`,
-                {
-                    room_id: roomId,
-                    agent_id: agentId,
-                    replace_latest_agent: false,
-                    max_agent: 1,
-                },
-                {
-                    headers: {
-                        "Qiscus-Secret-Key": appConfig.qiscusKey,
-                        "Qiscus-App-Id": appConfig.qiscusAppId,
-                    },
-                }
-            )
-            .then((raw) => raw.data);
+        const res = await fetch(`${appConfig.apiUrl}/v1/admin/service/assign_agent`, {
+            method: "POST",
+            headers: {
+                "Qiscus-Secret-Key": appConfig.secretKey,
+                "Qiscus-App-Id": appConfig.appId,
+            },
+            body: JSON.stringify({
+                room_id: roomId,
+                agent_id: agentId,
+                replace_latest_agent: false,
+                max_agent: 1,
+            }),
+        }).then((raw) => raw.json());
+
+        return parseStringify(res);
     } catch (error) {
         console.error(error, "Failed to assign an agent");
     }
