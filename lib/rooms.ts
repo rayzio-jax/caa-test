@@ -36,12 +36,12 @@ export async function getRooms(): Promise<Room[]> {
  * @param {string} channelId - The chat room channel id
  * @returns {Promise<Room[]>} List of on-queue rooms
  */
-export async function getQueueRoomsByChannelId(channelId: string): Promise<Room[]> {
+export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[]> {
     try {
         const rooms = await db
             .select()
             .from(TbRooms)
-            .where(and(eq(TbRooms.channel_id, channelId), eq(TbRooms.status, "QUEUE")))
+            .where(and(eq(TbRooms.channel_id, String(channelId)), eq(TbRooms.status, "QUEUE")))
             .orderBy(asc(TbRooms.created_at))
             .catch((err) => {
                 console.error(`Failed to get rooms with status "QUEUE"${channelId && ` on channel ${channelId}`}.`);
@@ -61,12 +61,12 @@ export async function getQueueRoomsByChannelId(channelId: string): Promise<Room[
  * @param {string} agentId - Id of agent that handle the room
  * @returns {Promise<Room[]>} List of handled rooms
  */
-export async function getHandledRooms(agentId: string): Promise<Room[]> {
+export async function getHandledRooms(agentId: number): Promise<Room[]> {
     try {
         const rooms = await db
             .select()
             .from(TbRooms)
-            .where(and(eq(TbRooms.agent_id, agentId), eq(TbRooms.status, "HANDLED")))
+            .where(and(eq(TbRooms.agent_id, String(agentId)), eq(TbRooms.status, "HANDLED")))
             .catch((err) => {
                 console.error('Failed to get rooms with status "HANDLED".');
                 throw err;
@@ -88,13 +88,13 @@ export async function getHandledRooms(agentId: string): Promise<Room[]> {
  * @returns {Promise<Rooms>} Return values of inserted room.
  */
 
-export async function addNewRoom({ roomId, channelId }: { roomId: string; channelId: string }): Promise<Room[]> {
+export async function addNewRoom({ roomId, channelId }: { roomId: number; channelId: number }): Promise<Room[]> {
     try {
         const inserted = await db
             .insert(TbRooms)
             .values({
-                room_id: roomId,
-                channel_id: channelId,
+                room_id: String(roomId),
+                channel_id: String(channelId),
             })
             .returning()
             .catch((err) => {
@@ -120,18 +120,18 @@ export async function addNewRoom({ roomId, channelId }: { roomId: string; channe
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: string; channelId: string; agentId: string; roomStatus: Room["status"] }): Promise<Room[]> {
+export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
         const updated = await db
             .update(TbRooms)
             .set({
-                agent_id: agentId,
+                agent_id: String(agentId),
                 status: roomStatus,
                 updated_at,
             })
-            .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId), ne(TbRooms.status, roomStatus)))
+            .where(and(eq(TbRooms.room_id, String(roomId)), eq(TbRooms.channel_id, String(roomId)), ne(TbRooms.status, roomStatus)))
             .returning()
             .catch((err) => {
                 console.error(`Failed to update room. Missing required values or internal error.`);
