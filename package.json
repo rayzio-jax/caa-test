@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "expose": "ngrok http --hostname=bull-still-externally.ngrok-free.app 3000",
     "lint": "next lint",
     "postinstall": "npx drizzle-kit generate && npx drizzle-kit migrate"
   },
