@@ -14,12 +14,18 @@ declare type Payload = {
     payload: any;
 };
 
+declare interface FilteredAgents {
+    online: { agents: Agent[]; count: number };
+    offline: { agents: Agent[]; count: number };
+}
+
 declare interface Agent {
     id: string;
     email: string;
     name: string;
+    current_customer_count: number;
     user_channels: {
-        id: string;
+        id: number;
         name: string;
     }[];
 }
