@@ -2,7 +2,7 @@ import { pgEnum, pgTable, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
 
 export const statusEnum = pgEnum("status", ["QUEUE", "HANDLED", "RESOLVED"]);
 
-export const roomsTable = pgTable("rooms", {
+export const TbRooms = pgTable("rooms", {
     id: uuid().primaryKey().defaultRandom(),
     room_id: varchar({ length: 255 }).notNull(),
     channel_id: varchar({ length: 255 }).notNull(),
