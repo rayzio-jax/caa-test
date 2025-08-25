@@ -1,7 +1,9 @@
 "use server";
 
+import axios from "axios";
 import appConfig from "./config";
 import { parseStringify } from "./utils";
+import { getHandledRooms } from "./rooms";
 
 const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
@@ -38,7 +40,16 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
             return { online: { agents: [], count: 0 }, offline: { agents: [], count: 0 } };
         }
 
-        const onlineAgents = agents.data.filter((agent) => agent.is_available && agent.current_customer_count < MAX_CUSTOMER);
+        const availableAgents: Agent[] = agents.data.filter((agent) => agent.is_available);
+        let onlineAgents: Agent[] = [];
+        for (const agent of availableAgents) {
+            const handledRooms = (await getHandledRooms(Number(agent.id))).length;
+
+            if (handledRooms < MAX_CUSTOMER) {
+                onlineAgents.push(agent);
+            }
+        }
+
         const offlineAgents = agents.data.filter((agent) => !agent.is_available);
 
         return { online: { agents: onlineAgents, count: onlineAgents.length }, offline: { agents: offlineAgents, count: offlineAgents.length } };
@@ -56,25 +67,31 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
  * @param {string} params.agentId - The ID of the agent being assigned.
  */
 
-export const assignAgent = async ({ roomId, agentId }: { roomId: string; agentId: string }) => {
+export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId: number }) => {
     try {
-        if (!roomId || !agentId) throw new Error("roomId or agentId is empty.");
+        const res = await axios
+            .post(
+                `${appConfig.apiUrl}/v1/admin/service/assign_agent`,
+                {
+                    room_id: String(roomId),
+                    agent_id: String(agentId),
+                    replace_latest_agent: false,
+                    max_agent: 1,
+                },
+                {
+                    headers: {
+                        "Qiscus-Secret-Key": appConfig.secretKey,
+                        "Qiscus-App-Id": appConfig.appId,
+                    },
+                }
+            )
+            .then((raw) => raw.data);
 
-        const res = await fetch(`${appConfig.apiUrl}/v1/admin/service/assign_agent`, {
-            method: "POST",
-            headers: {
-                "Qiscus-Secret-Key": appConfig.secretKey,
-                "Qiscus-App-Id": appConfig.appId,
-            },
-            body: JSON.stringify({
-                room_id: roomId,
-                agent_id: agentId,
-                replace_latest_agent: false,
-                max_agent: 1,
-            }),
-        }).then((raw) => raw.json());
+        const agent = res.data.added_agent;
+        const room = res.data.service;
 
-        return parseStringify(res);
+        console.log(`✅ Agent ${agent.id}/${agent.name} has assigned to room ${room.room_id}`);
+        return parseStringify(res.data);
     } catch (error) {
         console.error(error, "Failed to assign an agent");
     }
