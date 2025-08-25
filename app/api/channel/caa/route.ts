@@ -1,5 +1,5 @@
 import appConfig from "@/lib/config";
-import { assignAgent, getAgents, getFilteredAgents } from "@/lib/qiscus";
+import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
 import { addNewRoom, getHandledRooms, getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 import { NextResponse } from "next/server";
@@ -24,18 +24,13 @@ export async function POST(req: Request) {
         const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
         const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-        console.log(`❗ Current ${candidateAgent.id} load: ${handledRooms}`);
-
-        if ((online.count > 0 && candidateAgent && candidateAgent.current_customer_count < MAX_CUSTOMER) || handledRooms < MAX_CUSTOMER) {
-            const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-
-            if (room) {
-                await assignAgent({ roomId: room_id, agentId: candidateAgent.id });
-                console.log(`❗ Current ${candidateAgent.id} load: ${handledRooms + 1}`);
-            }
+        if (handledRooms < MAX_CUSTOMER && candidateAgent) {
+            await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            await assignAgent({ roomId: queueRooms[0].room_id, agentId: candidateAgent.id });
+            console.log(`✅ Agent ${candidateAgent.id}/${candidateAgent.name} assigned for room ${queueRooms[0].room_id}`);
+            console.log(`❗ Current ${candidateAgent.id}/${candidateAgent.name} load: ${handledRooms + 1}`);
         } else {
-            console.log(`⚠️ Agent cannot handle more rooms`);
-            await addNewRoom({ roomId: room_id, channelId: channel_id });
+            console.log(`⚠️ Agent ${candidateAgent.id}/${candidateAgent.name} cannot handle more rooms`);
         }
 
         return NextResponse.json({ status: "ok", message: `success processing room ${room_id}` }, { status: 200 });
