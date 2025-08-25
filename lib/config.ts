@@ -11,7 +11,7 @@ const appConfig = {
     apiUrl: process.env.QISCUS_API_URL!,
     secretKey: process.env.QISCUS_KEY!,
     appId: process.env.QISCUS_APP_ID!,
-    agentDivisionId: Number(process.env.QISCUS_AGENT_DIVISON_ID!),
+    agentDivisionId: Number(process.env.QISCUS_AGENT_DIVISION_ID!),
     agentMaxCustomer: Number(process.env.AGENT_MAX_CUSTOMERS!),
     dbUrl: process.env.DATABASE_URL!,
 };
