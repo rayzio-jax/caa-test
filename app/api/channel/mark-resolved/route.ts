@@ -17,8 +17,10 @@ export async function POST(req: Request) {
 
         const { online } = await getFilteredAgents();
         const candidateAgent = online.agents[0];
-        const handledRooms = (await getHandledRooms(agent_id)).length;
+        const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
         const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
+
+        console.log(`❗ Current ${candidateAgent.id}/${candidateAgent.name} load: ${handledRooms}`);
 
         if (handledRooms < MAX_CUSTOMER && queueRooms.length > 0 && candidateAgent) {
             const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });

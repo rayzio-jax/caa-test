@@ -35,7 +35,7 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ status: "ok", message: `success processing room ${room_id}` }, { status: 200 });
     } catch (error) {
-        console.error("Failed to process Custom Allocation.", error);
+        console.error(error, "Failed to process Custom Allocation.");
         return responsePayload("error", "Internal server error. Please check server config.", {}, 500);
     }
 }
