@@ -104,6 +104,17 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
     }
 }
 
+/**
+ * Update room data based on room id and channel id
+ *
+ * @param {Object} params - Parameters object.
+ * @param {number} params.roomId - Targetted room id
+ * @param {number} params.channelId - Targetted channel id
+ * @param {number} params.agentId - The agent that will be assigned
+ * @param {status} params.roomStatus - The room waiting status.
+ * @returns {Promise<Rooms[]>} Return values of the updated room.
+ */
+
 export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
@@ -128,11 +139,9 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
 /**
  * Assign agent to a room through transaction lock
  *
- * @param {Object} params - Parameters object.
- * @param {string} params.roomId - The ID of the room to update.
- * @param {string} params.channelId - The room's channel.
- * @param {status} params.roomStatus - Optional room status. See Room["status"].
- * @returns {Promise<Rooms>} Return values of the updated room.
+ * @param {Array} rooms - Array of rooms.
+ * @param {status} roomStatus - The room waiting status.
+ * @returns {Promise<Rooms[]>} Return values of the updated room.
  */
 
 export async function updateRoomTransaction(rooms: Room[], roomStatus: Room["status"]): Promise<Room[]> {
