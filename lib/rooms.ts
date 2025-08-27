@@ -124,21 +124,37 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
     const updated_at = new Date();
 
     try {
-        const updated = await db
-            .update(TbRooms)
-            .set({
-                agent_id: String(agentId),
-                status: roomStatus,
-                updated_at,
+        const room = await db
+            .transaction(async (tx) => {
+                const room = await tx
+                    .select()
+                    .from(TbRooms)
+                    .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString())))
+                    .for("update");
+
+                if (!room) {
+                    console.log("❌ No available room to update");
+                    throw new Error(`❌ Room ${roomId} not found`);
+                }
+
+                const updated = await tx
+                    .update(TbRooms)
+                    .set({
+                        agent_id: agentId.toString(),
+                        status: roomStatus,
+                        updated_at,
+                    })
+                    .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString()), ne(TbRooms.status, roomStatus)))
+                    .returning();
+
+                return updated;
             })
-            .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString()), ne(TbRooms.status, roomStatus)))
-            .returning()
             .catch((err) => {
                 console.error(`Failed to update room. Missing required values or internal error.`);
                 throw err;
             });
 
-        return parseStringify(updated) as Room[];
+        return parseStringify(room) as Room[];
     } catch (error) {
         console.error(error);
         return [];
