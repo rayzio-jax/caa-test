@@ -3,10 +3,11 @@
 import { and, asc, eq, ne } from "drizzle-orm";
 import { db } from "./db";
 import { TbRooms } from "./schema";
+import { assignAgent, getFilteredAgents } from "./qiscus";
+import { parseStringify } from "./utils";
+import appConfig from "./config";
 
-const parseStringify = (values: unknown) => {
-    return JSON.parse(JSON.stringify(values));
-};
+const MAX_CUSTOMER = appConfig.agentMaxCustomer || 2;
 
 /**
  * Gets the list of all customer rooms
@@ -26,7 +27,7 @@ export async function getRooms(): Promise<Room[]> {
         return parseStringify(rooms) as Room[];
     } catch (error) {
         console.error(error);
-        return [];
+        throw error;
     }
 }
 
@@ -51,7 +52,7 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
         return parseStringify(rooms) as Room[];
     } catch (error) {
         console.error(error);
-        return [];
+        throw error;
     }
 }
 
@@ -75,7 +76,7 @@ export async function getHandledRooms(agentId: number): Promise<Room[]> {
         return parseStringify(rooms) as Room[];
     } catch (error) {
         console.error(error);
-        return [];
+        throw error;
     }
 }
 
@@ -105,17 +106,16 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
         return parseStringify(inserted) as Room[];
     } catch (error) {
         console.error(error);
-        return [];
+        throw error;
     }
 }
 
 /**
- * Update the status of a room by its ID.
+ * Assign agent to a room through transaction lock
  *
  * @param {Object} params - Parameters object.
  * @param {string} params.roomId - The ID of the room to update.
  * @param {string} params.channelId - The room's channel.
- * @param {string} params.agentId - Optional agent ID assigned to the room.
  * @param {status} params.roomStatus - Optional room status. See Room["status"].
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
@@ -157,6 +157,6 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
         return parseStringify(room) as Room[];
     } catch (error) {
         console.error(error);
-        return [];
+        throw error;
     }
 }
