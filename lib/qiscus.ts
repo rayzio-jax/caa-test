@@ -5,25 +5,26 @@ import appConfig from "./config";
 import { getHandledRooms } from "./rooms";
 import { parseStringify } from "./utils";
 
-const MAX_CUSTOMER = appConfig.agentMaxCustomer;
+const MAX_CUSTOMER = appConfig.agentMaxCustomer || 2;
 
 /**
  * Gets the list of available agents for a room.
  *
- * @returns {Promise<{ online: Agent[]; offline: Agent[] }>} A promise that resolves to a list of available agents.
+ * @returns {Promise<{ data?: any[]; errors?: any; status?: number; meta?: any }>} A promise that resolves to a list of available agents.
  */
 export const getAgents = async (): Promise<{ data?: any[]; errors?: any; status?: number; meta?: any }> => {
     try {
-        const res = await fetch(`${appConfig.apiUrl}/v2/admin/agents/by_division?division_ids[]=${appConfig.agentDivisionId}`, {
-            method: "GET",
-            headers: {
-                "Qiscus-Secret-Key": appConfig.secretKey,
-                "Qiscus-App-Id": appConfig.appId,
-            },
-            next: {
-                revalidate: 60,
-            },
-        }).then((raw) => raw.json());
+        const res = await axios
+            .get(`${appConfig.apiUrl}/v2/admin/agents/by_division`, {
+                params: {
+                    "division_ids[]": appConfig.agentDivisionId,
+                },
+                headers: {
+                    "Qiscus-Secret-Key": appConfig.secretKey,
+                    "Qiscus-App-Id": appConfig.appId,
+                },
+            })
+            .then((raw) => raw.data);
 
         return parseStringify(res);
     } catch (error) {
@@ -32,31 +33,31 @@ export const getAgents = async (): Promise<{ data?: any[]; errors?: any; status?
     }
 };
 
+/**
+ * Get agents, filter it based on their availability, and sort `ASC` based on their name
+ *
+ * @returns {FilteredAgents} List of online and offline agents
+ */
 export const getFilteredAgents = async (): Promise<FilteredAgents> => {
     try {
         const agents = await getAgents();
 
-        if (!agents.data) {
-            return { online: { agents: [], count: 0 }, offline: { agents: [], count: 0 } };
-        }
+        const availableAgents: Agent[] = Array.isArray(agents.data) ? agents.data.filter((agent) => agent.is_available).sort((a: Agent, b: Agent) => a.name.localeCompare(b.name)) : [];
 
-        const availableAgents: Agent[] = agents.data.filter((agent) => agent.is_available);
-        let onlineAgents: Agent[] = [];
+        let resultAgents: Agent[] = [];
         for (const agent of availableAgents) {
-            const handledRooms = (await getHandledRooms(agent.id)).length;
+            const handledRooms = await getHandledRooms(agent.id);
 
-            if (handledRooms < MAX_CUSTOMER) {
-                console.log(`ℹ️ Agent ${agent.name} available, load: ${handledRooms}`);
-                onlineAgents.push(agent);
+            if (handledRooms && handledRooms.length < MAX_CUSTOMER) {
+                console.log(`❗ Agent ${agent.name} available, load: ${handledRooms}`);
+                resultAgents.push({ ...agent, current_customer_count: handledRooms.length });
             }
         }
 
-        const offlineAgents = agents.data.filter((agent) => !agent.is_available);
-
-        return { online: { agents: onlineAgents, count: onlineAgents.length }, offline: { agents: offlineAgents, count: offlineAgents.length } };
+        return { agents: resultAgents, count: resultAgents.length };
     } catch (error) {
         console.error("Failed to get filtered agents");
-        return { online: { agents: [], count: 0 }, offline: { agents: [], count: 0 } };
+        return { agents: [], count: 0 };
     }
 };
 
@@ -95,7 +96,7 @@ export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId
         const agent = res.data.added_agent;
         const room = res.data.service;
 
-        console.log(`✔ Agent ${agent.id}/${agent.name} has assigned to room ${room.room_id}`);
+        console.log(`✓ Agent ${agent.id}/${agent.name} has assigned to room ${room.room_id}`);
         return parseStringify(res.data);
     } catch (error: any) {
         if (error.response) {
