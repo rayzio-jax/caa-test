@@ -15,8 +15,8 @@ declare type Payload = {
 };
 
 declare interface FilteredAgents {
-    online: { agents: Agent[]; count: number };
-    offline: { agents: Agent[]; count: number };
+    agents: Agent[];
+    count: number;
 }
 
 declare interface Agent {
