@@ -2,8 +2,8 @@
 
 import axios from "axios";
 import appConfig from "./config";
-import { parseStringify } from "./utils";
 import { getHandledRooms } from "./rooms";
+import { parseStringify } from "./utils";
 
 const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
@@ -43,9 +43,10 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
         const availableAgents: Agent[] = agents.data.filter((agent) => agent.is_available);
         let onlineAgents: Agent[] = [];
         for (const agent of availableAgents) {
-            const handledRooms = (await getHandledRooms(Number(agent.id))).length;
+            const handledRooms = (await getHandledRooms(agent.id)).length;
 
             if (handledRooms < MAX_CUSTOMER) {
+                console.log(`ℹ️ Agent ${agent.name} available, load: ${handledRooms}`);
                 onlineAgents.push(agent);
             }
         }
@@ -68,13 +69,17 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
  */
 
 export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId: number }) => {
+    if (!roomId || !agentId) {
+        throw new Error("Missing 'agentId' or 'roomId'.");
+    }
+
     try {
         const res = await axios
             .post(
                 `${appConfig.apiUrl}/v1/admin/service/assign_agent`,
                 {
-                    room_id: String(roomId),
-                    agent_id: String(agentId),
+                    room_id: roomId.toString(),
+                    agent_id: agentId.toString(),
                     replace_latest_agent: false,
                     max_agent: 1,
                 },
@@ -90,9 +95,13 @@ export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId
         const agent = res.data.added_agent;
         const room = res.data.service;
 
-        console.log(`✅ Agent ${agent.id}/${agent.name} has assigned to room ${room.room_id}`);
+        console.log(`✔ Agent ${agent.id}/${agent.name} has assigned to room ${room.room_id}`);
         return parseStringify(res.data);
-    } catch (error) {
-        console.error(error, "Failed to assign an agent");
+    } catch (error: any) {
+        if (error.response) {
+            console.error(`${error.response.statusText} [${error.response.status}]: ${error.response.data.errors.message}`);
+        } else {
+            throw error;
+        }
     }
 };
