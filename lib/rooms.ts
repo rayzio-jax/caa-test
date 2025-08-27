@@ -1,11 +1,11 @@
 "use server";
 
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq, count, ne, isNull } from "drizzle-orm";
+import appConfig from "./config";
 import { db } from "./db";
 import { TbRooms } from "./schema";
-import { assignAgent, getFilteredAgents } from "./qiscus";
 import { parseStringify } from "./utils";
-import appConfig from "./config";
+import { getFilteredAgents } from "./qiscus";
 
 const MAX_CUSTOMER = appConfig.agentMaxCustomer || 2;
 
@@ -43,11 +43,7 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
             .select()
             .from(TbRooms)
             .where(and(eq(TbRooms.channel_id, channelId.toString()), eq(TbRooms.status, "QUEUE")))
-            .orderBy(asc(TbRooms.created_at))
-            .catch((err) => {
-                console.error(`Failed to get rooms with status "QUEUE"${channelId && ` on channel ${channelId}`}.`);
-                throw err;
-            });
+            .orderBy(asc(TbRooms.created_at));
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -62,10 +58,10 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
  * @param {string} agentId - Id of agent that handle the room
  * @returns {Promise<Room[]>} List of handled rooms
  */
-export async function getHandledRooms(agentId: number): Promise<Room[]> {
+export async function getHandledRooms(agentId: number) {
     try {
-        const rooms = await db
-            .select()
+        const countRooms = await db
+            .select({ count: count() })
             .from(TbRooms)
             .where(and(eq(TbRooms.agent_id, agentId.toString()), eq(TbRooms.status, "HANDLED")))
             .catch((err) => {
@@ -73,7 +69,7 @@ export async function getHandledRooms(agentId: number): Promise<Room[]> {
                 throw err;
             });
 
-        return parseStringify(rooms) as Room[];
+        return countRooms;
     } catch (error) {
         console.error(error);
         throw error;
@@ -110,6 +106,27 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
     }
 }
 
+export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
+    const updated_at = new Date();
+
+    try {
+        const room = await db
+            .update(TbRooms)
+            .set({
+                agent_id: agentId?.toString(),
+                status: roomStatus,
+                updated_at,
+            })
+            .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString()), ne(TbRooms.status, roomStatus)))
+            .returning();
+
+        return parseStringify(room) as Room[];
+    } catch (error) {
+        console.error(error);
+        throw error;
+    }
+}
+
 /**
  * Assign agent to a room through transaction lock
  *
@@ -120,7 +137,7 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
  * @returns {Promise<Rooms>} Return values of the updated room.
  */
 
-export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
+export async function updateRoomTransaction({ roomId, channelId, roomStatus }: { roomId: number; channelId: number; roomStatus: Room["status"] }): Promise<Room[]> {
     const updated_at = new Date();
 
     try {
@@ -132,25 +149,33 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
                     .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString())))
                     .for("update");
 
-                if (!room) {
+                if (room.length === 0) {
                     console.log("❌ No available room to update");
                     throw new Error(`❌ Room ${roomId} not found`);
                 }
 
+                const { agents, count } = await getFilteredAgents();
+
+                if (!agents[0] || count === 0) {
+                    console.log(`⚠︎ No available agents to handle room ${room[0].room_id}`);
+                    throw new Error("NO_AGENT_AVAILABLE");
+                }
+
+                console.log(`👤 Found agent ${agents[0].id}/${agents[0].name} for room ${room[0].room_id}`);
                 const updated = await tx
                     .update(TbRooms)
                     .set({
-                        agent_id: agentId.toString(),
+                        agent_id: agents[0].id.toString(),
                         status: roomStatus,
                         updated_at,
                     })
-                    .where(and(eq(TbRooms.room_id, roomId.toString()), eq(TbRooms.channel_id, channelId.toString()), ne(TbRooms.status, roomStatus)))
+                    .where(and(eq(TbRooms.room_id, room[0].room_id), eq(TbRooms.channel_id, room[0].channel_id), ne(TbRooms.status, roomStatus), isNull(TbRooms.agent_id)))
                     .returning();
 
                 return updated;
             })
             .catch((err) => {
-                console.error(`Failed to update room. Missing required values or internal error.`);
+                console.error(`${err.statusText} ${err.status}`);
                 throw err;
             });
 
