@@ -1,9 +1,6 @@
-import appConfig from "@/lib/config";
-import { assignAgent, getAgents, getFilteredAgents } from "@/lib/qiscus";
-import { getHandledRooms, getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
+import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
+import { getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
-
-const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
 export async function POST(req: Request) {
     try {
@@ -13,24 +10,39 @@ export async function POST(req: Request) {
             service: { room_id },
         } = await req.json();
 
-        await updateRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id, roomStatus: "RESOLVED" });
+        const updatedRoom = await updateRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id, roomStatus: "RESOLVED" });
 
-        const { online } = await getFilteredAgents();
-        const candidateAgent = online.agents[0];
-        const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
-        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
-
-        console.log(`❗ Current ${candidateAgent.id}/${candidateAgent.name} load: ${handledRooms}`);
-
-        if (handledRooms < MAX_CUSTOMER && queueRooms.length > 0 && candidateAgent) {
-            const room = await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-            await assignAgent({ agentId: Number(room[0].agent_id), roomId: room[0].room_id });
-            console.log(`✅ ${room_id} resolved by ${agent_id}/${agent_name}`);
+        if (!updatedRoom) {
+            throw Error;
         }
 
+        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
+
+        if (queueRooms.length > 0) {
+            for (const room of queueRooms) {
+                const { online } = await getFilteredAgents();
+
+                if (!online.agents || online.count === 0) {
+                    console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
+                    continue;
+                }
+
+                const candidateAgent = online.agents[0];
+                console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
+                const assigned = await updateRoom({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+                if (assigned.length > 0) {
+                    const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+                    console.log(
+                        res ? `✅ Success re-allocate agent ${candidateAgent.name} to room ${assigned[0].room_id}` : `❌ Failed re-allocate ${candidateAgent.name} to room ${assigned[0].room_id}`
+                    );
+                }
+            }
+        }
+
+        console.log(`✔ Room ${room_id} has resolved by ${agent_id}/${agent_name}`);
         return responsePayload("ok", `success mark as resolved room ${room_id}`, {}, 200);
-    } catch (error) {
-        console.error("Failed to mark resolved room", error);
+    } catch (error: any) {
+        console.error(error, "Failed to mark room as resolved");
         return responsePayload("error", "internal server error", {}, 500);
     }
 }

@@ -1,10 +1,7 @@
-import appConfig from "@/lib/config";
 import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
-import { addNewRoom, getHandledRooms, getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
+import { addNewRoom, getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
 import { responsePayload } from "@/lib/utils";
 import { NextResponse } from "next/server";
-
-const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
 export async function POST(req: Request) {
     try {
@@ -13,29 +10,36 @@ export async function POST(req: Request) {
             room_id,
         } = await req.json();
 
-        const room = await addNewRoom({ roomId: room_id, channelId: channel_id });
+        const newRoom = await addNewRoom({ roomId: room_id, channelId: channel_id });
 
-        if (!room) {
-            throw new Error("Failed to insert new room.");
+        if (!newRoom) {
+            throw new Error("Failed to insert new room");
         }
 
-        const { online } = await getFilteredAgents();
-        const candidateAgent = online.agents[0];
-        const handledRooms = (await getHandledRooms(candidateAgent.id)).length;
         const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-        if (handledRooms < MAX_CUSTOMER && candidateAgent) {
-            await updateRoom({ roomId: queueRooms[0].room_id, channelId: queueRooms[0].channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-            await assignAgent({ roomId: queueRooms[0].room_id, agentId: candidateAgent.id });
-            console.log(`✅ Agent ${candidateAgent.id}/${candidateAgent.name} assigned for room ${queueRooms[0].room_id}`);
-            console.log(`❗ Current ${candidateAgent.id}/${candidateAgent.name} load: ${handledRooms + 1}`);
-        } else {
-            console.log(`⚠️ Agent ${candidateAgent.id}/${candidateAgent.name} cannot handle more rooms`);
+        if (queueRooms.length > 0) {
+            for (const room of queueRooms) {
+                const { online } = await getFilteredAgents();
+
+                if (!online.agents || online.count === 0) {
+                    console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
+                    continue;
+                }
+
+                const candidateAgent = online.agents[0];
+                console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
+                const assigned = await updateRoom({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+                if (assigned.length > 0) {
+                    const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+                    console.log(res ? `✅ Success allocate ${candidateAgent.name} to room ${assigned[0].room_id}` : `❌ Failed allocate ${candidateAgent.name} to room ${room.room_id}`);
+                }
+            }
         }
 
         return NextResponse.json({ status: "ok", message: `success processing room ${room_id}` }, { status: 200 });
-    } catch (error) {
-        console.error(error, "Failed to process Custom Allocation.");
+    } catch (error: any) {
+        console.error(error, "Failed to run agent allocation");
         return responsePayload("error", "Internal server error. Please check server config.", {}, 500);
     }
 }
