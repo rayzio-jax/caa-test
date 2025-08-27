@@ -1,5 +1,5 @@
 import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
-import { getQueueRoomsByChannelId, updateRoom } from "@/lib/rooms";
+import { getQueueRoomsByChannelId, updateRoom, updateRoomTransaction } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -17,23 +17,28 @@ export async function POST(req: Request) {
         } else {
             const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-            if (queueRooms.length > 0) {
-                for (const room of queueRooms) {
-                    const {
-                        agents: [candidateAgent],
-                        count,
-                    } = await getFilteredAgents();
+            if (queueRooms.length === 0) {
+                console.log("⚠︎ No available room to handle");
+            }
 
-                    if (!candidateAgent || count === 0) {
-                        console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
-                        continue;
-                    }
+            for (const room of queueRooms) {
+                const {
+                    agents: [candidateAgent],
+                    count,
+                } = await getFilteredAgents();
 
-                    console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
-                    const assigned = await updateRoom({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-                    if (assigned.length > 0) {
-                        const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
-                        console.log(res ? `✅ Success allocate ${candidateAgent.name} to room ${assigned[0].room_id}` : `❌ Failed allocate ${candidateAgent.name} to room ${room.room_id}`);
+                if (!candidateAgent || count === 0) {
+                    console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
+                    continue;
+                }
+
+                console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
+                const [assigned] = await updateRoomTransaction({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+                if (assigned) {
+                    const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+
+                    if (!res) {
+                        console.log(`❌ Failed allocate ${candidateAgent.name} to room ${room.room_id}`);
                     }
                 }
             }
