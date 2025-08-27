@@ -19,7 +19,7 @@ export async function GET() {
         for (const room of rooms) {
             const res = await axios
                 .post(
-                    `${appConfig.apiUrl}/v1/admin/service/mark_as_resolved`,
+                    `${appConfig.apiUrl}/api/v1/admin/service/mark_as_resolved`,
                     {
                         room_id: room.room_id,
                     },

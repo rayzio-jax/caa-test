@@ -15,7 +15,7 @@ const MAX_CUSTOMER = appConfig.agentMaxCustomer || 2;
 export const getAgents = async (): Promise<{ data?: any[]; errors?: any; status?: number; meta?: any }> => {
     try {
         const res = await axios
-            .get(`${appConfig.apiUrl}/v2/admin/agents/by_division`, {
+            .get(`${appConfig.apiUrl}/api/v2/admin/agents/by_division`, {
                 params: {
                     "division_ids[]": appConfig.agentDivisionId,
                 },
@@ -80,7 +80,7 @@ export const assignAgent = async ({ roomId, agentId }: { roomId: number; agentId
     try {
         const res = await axios
             .post(
-                `${appConfig.apiUrl}/v1/admin/service/assign_agent`,
+                `${appConfig.apiUrl}/api/v1/admin/service/assign_agent`,
                 {
                     room_id: roomId.toString(),
                     agent_id: agentId.toString(),
