@@ -5,12 +5,18 @@ import axios from "axios";
 import { eq, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(req: Request) {
     try {
-        const rooms = await db
+        const { searchParams } = new URL(req.url);
+        const qty = Number(searchParams.get("qty"));
+        const status = searchParams.get("status")?.split(",") || [];
+
+        const query = db
             .select()
             .from(TbRooms)
-            .where(or(eq(TbRooms.status, "QUEUE"), eq(TbRooms.status, "HANDLED")));
+            .where(status.length > 0 ? or(...status.map((statusRoom) => eq(TbRooms.status, statusRoom as Room["status"]))) : or(eq(TbRooms.status, "QUEUE"), eq(TbRooms.status, "HANDLED")));
+
+        const rooms = !qty || Number.isNaN(qty) || qty === 0 ? await query : await query.limit(qty).execute();
 
         if (!rooms || rooms.length === 0 || !Array.isArray(rooms)) {
             return NextResponse.json({ message: "no available rooms to be resolved" }, { status: 404 });
@@ -38,9 +44,9 @@ export async function GET() {
 
         const payload = rooms.map((room) => ({ id: room.id, room_id: room.room_id, channel_id: room.channel_id, created_at: room.created_at }));
 
-        return NextResponse.json({ message: "success resolving all rooms", payload }, { status: 200 });
+        return NextResponse.json({ status: 200, message: "success resolving all rooms", payload }, { status: 200 });
     } catch (error) {
         console.error(error, "Failed to resolve all rooms");
-        return NextResponse.json({ errors: { message: "internal server error, please check server config" } }, { status: 500 });
+        return NextResponse.json({ status: 500, errors: { message: "internal server error, please check server config" } }, { status: 500 });
     }
 }
