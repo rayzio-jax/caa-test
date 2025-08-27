@@ -1,9 +1,9 @@
 import appConfig from "@/lib/config";
 import { db } from "@/lib/db";
 import { TbRooms } from "@/lib/schema";
-import { responsePayload } from "@/lib/utils";
 import axios from "axios";
 import { eq, or } from "drizzle-orm";
+import { NextResponse } from "next/server";
 
 export async function GET() {
     try {
@@ -11,6 +11,10 @@ export async function GET() {
             .select()
             .from(TbRooms)
             .where(or(eq(TbRooms.status, "QUEUE"), eq(TbRooms.status, "HANDLED")));
+
+        if (!rooms || rooms.length === 0 || !Array.isArray(rooms)) {
+            return NextResponse.json({ message: "no available rooms to be resolved" }, { status: 404 });
+        }
 
         for (const room of rooms) {
             const res = await axios
@@ -32,9 +36,11 @@ export async function GET() {
             console.log(`✔ Successful resolve room ${res.data.room_info.room.room_id}`);
         }
 
-        return responsePayload("ok", "success resolve all rooms", {}, 200);
+        const payload = rooms.map((room) => ({ id: room.id, room_id: room.room_id, channel_id: room.channel_id, created_at: room.created_at }));
+
+        return NextResponse.json({ message: "success resolving all rooms", payload }, { status: 200 });
     } catch (error) {
         console.error(error, "Failed to resolve all rooms");
-        return responsePayload("error", "failed to resolve all rooms", {}, 500);
+        return NextResponse.json({ errors: { message: "internal server error, please check server config" } }, { status: 500 });
     }
 }
