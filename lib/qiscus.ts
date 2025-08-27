@@ -42,15 +42,18 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
     try {
         const agents = await getAgents();
 
-        const availableAgents: Agent[] = Array.isArray(agents.data) ? agents.data.filter((agent) => agent.is_available).sort((a: Agent, b: Agent) => a.name.localeCompare(b.name)) : [];
+        const availableAgents: Agent[] = Array.isArray(agents.data)
+            ? agents.data.filter((agent) => agent.is_available && agent.current_customer_count < MAX_CUSTOMER).sort((a: Agent, b: Agent) => a.name.localeCompare(b.name))
+            : [];
 
         let resultAgents: Agent[] = [];
         for (const agent of availableAgents) {
             const handledRooms = await getHandledRooms(agent.id);
+            const customerCount = handledRooms[0].count;
 
-            if (handledRooms && handledRooms.length < MAX_CUSTOMER) {
-                console.log(`❗ Agent ${agent.name} available, load: ${handledRooms}`);
-                resultAgents.push({ ...agent, current_customer_count: handledRooms.length });
+            if (customerCount < MAX_CUSTOMER) {
+                console.log(`❗ Agent ${agent.name} available, load: ${customerCount}`);
+                resultAgents.push({ ...agent, current_customer_count: customerCount });
             }
         }
 
