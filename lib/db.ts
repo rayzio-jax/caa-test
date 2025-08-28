@@ -5,12 +5,12 @@ import appConfig from "./config";
 // Tune Neon connection pool
 const pool = new Pool({
     connectionString: appConfig.dbUrl,
-    max: 20, // Max connections; adjust based on Neon's limits (e.g., 20-50 for standard plans)
-    min: 5, // Minimum idle connections to keep open
-    idleTimeoutMillis: 30000, // Close idle connections after 30s
-    connectionTimeoutMillis: 2000, // Timeout for acquiring a connection
-    maxUses: 7500, // Max queries per connection before recycling
-    statement_timeout: 5000, // Timeout for individual queries (5s)
+    max: 30, // Increased for bulk load
+    min: 5,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 3000, // Slightly increased
+    maxUses: 7500,
+    statement_timeout: 10000, // Increased for resilience
 });
 
 // Connect database pool into drizzle ORM & export it for global use
