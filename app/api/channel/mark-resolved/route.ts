@@ -10,9 +10,9 @@ export async function POST(req: Request) {
             service: { room_id },
         } = await req.json();
 
-        const updatedRoom = await updateRoom({ roomId: room_id, channelId: channel_id, agentId: agent_id, roomStatus: "RESOLVED" });
+        const updatedRoom = await updateRoomTransaction({ roomId: room_id, channelId: channel_id, agentId: agent_id, roomStatus: "RESOLVED" });
 
-        if (updatedRoom.length === 0) {
+        if (!updatedRoom) {
             throw new Error(`Failed to mark as resolve room ${room_id}`);
         } else {
             const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
                 }
 
                 console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
-                const [assigned] = await updateRoomTransaction({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+                const assigned = await updateRoomTransaction({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
                 if (assigned) {
                     const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
 
