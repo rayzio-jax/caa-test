@@ -149,8 +149,6 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
                 .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .returning();
 
-            console.log(marked);
-
             return !!marked;
         });
 
