@@ -1,9 +1,8 @@
 "use server";
 
-import { and, asc, count, eq, isNotNull, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
 import appConfig from "./config";
 import { db } from "./db";
-import { assignAgent, getFilteredAgents } from "./qiscus";
 import { TbRooms } from "./schema";
 import { parseStringify } from "./utils";
 
@@ -40,8 +39,8 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
         const rooms = await db
             .select()
             .from(TbRooms)
-            .where(and(eq(TbRooms.channel_id, channelId), eq(TbRooms.status, "QUEUE")))
-            .orderBy(asc(TbRooms.created_at));
+            .where(and(eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
+            .orderBy(asc(TbRooms.createdAt));
 
         return parseStringify(rooms) as Room[];
     } catch (error) {
@@ -61,7 +60,7 @@ export async function getHandledRooms(agentId: number) {
         const countRooms = await db
             .select({ count: count() })
             .from(TbRooms)
-            .where(and(eq(TbRooms.agent_id, agentId), eq(TbRooms.status, "HANDLED")))
+            .where(and(eq(TbRooms.agentId, agentId), eq(TbRooms.status, "HANDLED")))
             .catch((err) => {
                 console.error('Failed to get rooms with status "HANDLED".');
                 throw err;
@@ -89,7 +88,7 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
             const [existing] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)));
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)));
 
             if (existing) {
                 return false;
@@ -98,8 +97,8 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
             const [room] = await tx
                 .insert(TbRooms)
                 .values({
-                    room_id: roomId,
-                    channel_id: channelId,
+                    id: roomId,
+                    channelId,
                 })
                 .returning();
 
@@ -124,14 +123,14 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
  */
 
 export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<boolean> {
-    const updated_at = new Date();
+    const updatedAt = new Date();
 
     try {
         const markedRoom = await db.transaction(async (tx) => {
             const [selected] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)))
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .for("update");
 
             if (!selected) {
@@ -142,10 +141,10 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
                 .update(TbRooms)
                 .set({
                     status: roomStatus,
-                    agent_id: agentId,
-                    updated_at,
+                    agentId: agentId,
+                    updatedAt,
                 })
-                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)))
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .returning();
 
             return marked ? true : false;
@@ -169,14 +168,14 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
  */
 
 export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
-    const updated_at = new Date();
+    const updatedAt = new Date();
 
     try {
         const assignedRoom = await db.transaction(async (tx) => {
             const [availableRooms] = await tx
                 .select({ count: count() })
                 .from(TbRooms)
-                .where(and(eq(TbRooms.agent_id, agentId), eq(TbRooms.status, "HANDLED")));
+                .where(and(eq(TbRooms.agentId, agentId), eq(TbRooms.status, "HANDLED")));
 
             if (availableRooms.count > appConfig.agentMaxCustomer) {
                 return false;
@@ -185,7 +184,7 @@ export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: 
             const [selectedRoom] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId), eq(TbRooms.status, "QUEUE")))
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
                 .for("update");
 
             if (!selectedRoom) {
@@ -195,11 +194,11 @@ export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: 
             const [assigned] = await tx
                 .update(TbRooms)
                 .set({
-                    agent_id: agentId,
+                    agentId: agentId,
                     status: roomStatus,
-                    updated_at,
+                    updatedAt,
                 })
-                .where(and(eq(TbRooms.room_id, selectedRoom.room_id), eq(TbRooms.channel_id, selectedRoom.channel_id), ne(TbRooms.status, roomStatus), isNull(TbRooms.agent_id)))
+                .where(and(eq(TbRooms.id, selectedRoom.id), eq(TbRooms.channelId, selectedRoom.channelId), ne(TbRooms.status, roomStatus), isNull(TbRooms.agentId)))
                 .returning();
 
             return assigned ? true : false;
