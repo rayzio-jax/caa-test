@@ -16,7 +16,7 @@ export async function GET(req: Request) {
             .from(TbRooms)
             .where(status.length > 0 ? or(...status.map((statusRoom) => eq(TbRooms.status, statusRoom as Room["status"]))) : or(eq(TbRooms.status, "QUEUE"), eq(TbRooms.status, "HANDLED")));
 
-        const rooms = !qty || Number.isNaN(qty) || qty === 0 ? await query : await query.limit(qty).execute();
+        const rooms = !qty || Number.isNaN(qty) || qty === 0 ? await query.execute() : await query.limit(qty).execute();
 
         if (!rooms || rooms.length === 0 || !Array.isArray(rooms)) {
             return NextResponse.json({ message: "no available rooms to be resolved" }, { status: 404 });
@@ -27,7 +27,7 @@ export async function GET(req: Request) {
                 .post(
                     `${appConfig.apiUrl}/api/v1/admin/service/mark_as_resolved`,
                     {
-                        room_id: room.room_id,
+                        room_id: room.id,
                     },
                     {
                         headers: {
@@ -42,7 +42,7 @@ export async function GET(req: Request) {
             console.log(`✔ Successful resolve room ${res.data.room_info.room.room_id}`);
         }
 
-        const payload = rooms.map((room) => ({ id: room.id, room_id: room.room_id, channel_id: room.channel_id, created_at: room.created_at }));
+        const payload = rooms.map((room) => ({ id: room.id, room_id: room.id, channel_id: room.channelId, created_at: room.createdAt }));
 
         return NextResponse.json({ status: 200, message: "success resolving all rooms", payload }, { status: 200 });
     } catch (error) {
