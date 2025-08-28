@@ -28,15 +28,15 @@ export async function POST(req: Request) {
             } = await getFilteredAgents();
 
             if (!candidateAgent || agentCount === 0) {
-                console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
-                return false;
+                console.log(`⚠︎ No available agents to handle room ${room.id}`);
+                continue;
             }
 
-            console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
+            console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.id}`);
 
-            const assignedRoom = await assignAgentTx({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            const assignedRoom = await assignAgentTx({ roomId: room.id, channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
             if (assignedRoom) {
-                await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+                await assignAgent({ roomId: room.id, agentId: candidateAgent.id });
             }
         }
         return NextResponse.json({ status: 200, message: `success inserted room ${room_id}`, payload: {} }, { status: 200 });
