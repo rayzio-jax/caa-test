@@ -1,13 +1,12 @@
-import { integer, pgEnum, pgTable, timestamp, uuid } from "drizzle-orm/pg-core";
+import { integer, pgEnum, pgTable, timestamp } from "drizzle-orm/pg-core";
 
 export const statusEnum = pgEnum("status", ["QUEUE", "HANDLED", "RESOLVED"]);
 
 export const TbRooms = pgTable("rooms", {
-    id: uuid().primaryKey().defaultRandom(),
-    room_id: integer().notNull(),
-    channel_id: integer().notNull(),
-    agent_id: integer(),
+    id: integer().primaryKey().default(0),
+    channelId: integer("channel_id").notNull(),
+    agentId: integer("agent_id"),
     status: statusEnum("status").notNull().default("QUEUE"),
-    created_at: timestamp().notNull().defaultNow(),
-    updated_at: timestamp().notNull().defaultNow(),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
