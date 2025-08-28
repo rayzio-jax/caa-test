@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, count, eq, isNull, ne } from "drizzle-orm";
+import { and, asc, count, eq, isNull, ne, sql } from "drizzle-orm";
 import appConfig from "./config";
 import { db } from "./db";
 import { TbRooms } from "./schema";
@@ -127,10 +127,12 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
 
     try {
         const markedRoom = await db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(${agentId})`);
+
             const [selected] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId), eq(TbRooms.status, "HANDLED")))
                 .for("update");
 
             if (!selected) {
@@ -147,7 +149,7 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
                 .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .returning();
 
-            return marked ? true : false;
+            return !!marked;
         });
 
         return markedRoom;
@@ -169,15 +171,18 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
 
 export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
     const updatedAt = new Date();
+    const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
     try {
         const assignedRoom = await db.transaction(async (tx) => {
+            await tx.execute(sql`SELECT pg_advisory_xact_lock(${agentId})`);
+
             const [availableRooms] = await tx
                 .select({ count: count() })
                 .from(TbRooms)
                 .where(and(eq(TbRooms.agentId, agentId), eq(TbRooms.status, "HANDLED")));
 
-            if (availableRooms.count > appConfig.agentMaxCustomer) {
+            if (availableRooms.count >= MAX_CUSTOMER) {
                 return false;
             }
 
@@ -201,7 +206,7 @@ export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: 
                 .where(and(eq(TbRooms.id, selectedRoom.id), eq(TbRooms.channelId, selectedRoom.channelId), ne(TbRooms.status, roomStatus), isNull(TbRooms.agentId)))
                 .returning();
 
-            return assigned ? true : false;
+            return !!assigned;
         });
 
         return assignedRoom;
