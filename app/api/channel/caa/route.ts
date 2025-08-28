@@ -1,5 +1,5 @@
 import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
-import { addNewRoom, assignAgentTx, getQueueRoomsByChannelId } from "@/lib/rooms";
+import { addNewRoom, assignAgentTx, getRoomsByChannel } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
             throw new Error(`Failed to save new room ${room_id}`);
         }
 
-        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
+        const queueRooms: Room[] = await getRoomsByChannel(channel_id);
 
         if (queueRooms.length === 0) {
             console.log("⚠︎ No available room to handle");
@@ -34,7 +34,7 @@ export async function POST(req: Request) {
 
             console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.id}`);
 
-            const assignedRoom = await assignAgentTx({ roomId: room.id, channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            const assignedRoom = await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
             if (assignedRoom) {
                 await assignAgent({ roomId: room.id, agentId: candidateAgent.id });
             }

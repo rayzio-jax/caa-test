@@ -1,5 +1,5 @@
 import { assignAgent, getFilteredAgents } from "@/lib/qiscus";
-import { getQueueRoomsByChannelId, markResolveTx, assignAgentTx } from "@/lib/rooms";
+import { assignAgentTx, getRoomsByChannel, markResolveTx } from "@/lib/rooms";
 import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
@@ -16,7 +16,7 @@ export async function POST(req: Request) {
             throw new Error(`Failed to mark as resolve room ${room_id}`);
         }
 
-        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
+        const queueRooms: Room[] = await getRoomsByChannel(channel_id);
 
         for (const room of queueRooms) {
             const {
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
             console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.id}`);
 
-            const assignedRoom = await assignAgentTx({ roomId: room.id, channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            const assignedRoom = await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
             if (assignedRoom) {
                 await assignAgent({ roomId: room.id, agentId: candidateAgent.id });
             }
