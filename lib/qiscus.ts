@@ -49,11 +49,10 @@ export const getFilteredAgents = async (): Promise<FilteredAgents> => {
         let resultAgents: Agent[] = [];
         for (const agent of availableAgents) {
             const handledRooms = await getHandledRooms(agent.id);
-            const customerCount = handledRooms[0].count;
 
-            if (customerCount < MAX_CUSTOMER) {
-                console.log(`❗ Agent ${agent.name} available, load: ${customerCount}`);
-                resultAgents.push({ ...agent, current_customer_count: customerCount });
+            if (handledRooms < MAX_CUSTOMER) {
+                console.log(`❗ Agent ${agent.name} available, load: ${handledRooms}`);
+                resultAgents.push({ ...agent, current_customer_count: handledRooms });
             }
         }
 
