@@ -21,7 +21,7 @@ export async function getRooms(): Promise<Room[]> {
                 throw err;
             });
 
-        return parseStringify(rooms) as Room[];
+        return parseStringify(rooms);
     } catch (error) {
         console.error(error);
         throw error;
@@ -42,7 +42,7 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
             .where(and(eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
             .orderBy(asc(TbRooms.createdAt));
 
-        return parseStringify(rooms) as Room[];
+        return parseStringify(rooms);
     } catch (error) {
         console.error(error);
         throw error;
@@ -55,9 +55,9 @@ export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[
  * @param {string} agentId - Id of agent that handle the room
  * @returns {Promise<Room[]>} List of handled rooms
  */
-export async function getHandledRooms(agentId: number) {
+export async function getHandledRooms(agentId: number): Promise<number> {
     try {
-        const countRooms = await db
+        const [countRooms] = await db
             .select({ count: count() })
             .from(TbRooms)
             .where(and(eq(TbRooms.agentId, agentId), eq(TbRooms.status, "HANDLED")))
@@ -66,7 +66,7 @@ export async function getHandledRooms(agentId: number) {
                 throw err;
             });
 
-        return countRooms;
+        return countRooms.count;
     } catch (error) {
         console.error(error);
         throw error;
@@ -102,7 +102,7 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
                 })
                 .returning();
 
-            return room ? true : false;
+            return !!room;
         });
 
         return inserted;
@@ -148,6 +148,8 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
                 })
                 .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .returning();
+
+            console.log(marked);
 
             return !!marked;
         });
