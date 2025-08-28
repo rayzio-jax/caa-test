@@ -40,9 +40,12 @@ export async function GET(req: Request) {
                 .then((raw) => raw.data);
 
             console.log(`✔ Successful resolve room ${res.data.room_info.room.room_id}`);
+            await db.update(TbRooms).set({ status: "RESOLVED" }).where(eq(TbRooms.id, room.id));
         }
 
         const payload = rooms.map((room) => ({ id: room.id, room_id: room.id, channel_id: room.channelId, created_at: room.createdAt }));
+
+        await db.delete(TbRooms).where(eq(TbRooms.status, "RESOLVED"));
 
         return NextResponse.json({ status: 200, message: "success resolving all rooms", payload }, { status: 200 });
     } catch (error) {
