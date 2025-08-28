@@ -13,7 +13,7 @@ export async function POST(req: Request) {
         const updatedRoom = await markResolveTx({ roomId: Number(room_id), channelId: Number(channel_id), agentId: Number(agent_id), roomStatus: "RESOLVED" });
 
         if (!updatedRoom) {
-            throw new Error(`Failed to mark as resolve room ${room_id}`);
+            return NextResponse.json({ status: 400, message: `room ${room_id} is already resolved or not found`, payload: {} }, { status: 400 });
         }
 
         const queueRooms: Room[] = await getRoomsByChannel(channel_id);

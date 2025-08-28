@@ -12,7 +12,7 @@ export async function POST(req: Request) {
         const newRoom = await addNewRoom({ roomId: room_id, channelId: channel_id });
 
         if (!newRoom) {
-            throw new Error(`Failed to save new room ${room_id}`);
+            return NextResponse.json({ status: 400, message: `Cannot save room ${room_id} to database`, payload: {} }, { status: 400 });
         }
 
         const queueRooms: Room[] = await getRoomsByChannel(channel_id);
