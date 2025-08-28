@@ -5,6 +5,7 @@ import appConfig from "./config";
 import { db } from "./db";
 import { TbRooms } from "./schema";
 import { parseStringify } from "./utils";
+import { assignAgent } from "./qiscus";
 
 /**
  * Gets the list of all customer rooms
@@ -132,7 +133,7 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
             const [selected] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId), eq(TbRooms.status, "HANDLED")))
+                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId)))
                 .for("update");
 
             if (!selected) {
@@ -169,7 +170,7 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
  * @returns {Promise<boolean>} Return values of the updated room.
  */
 
-export async function assignAgentTx({ channelId, agentId, roomStatus }: { channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
+export async function assignAgentTx({ channelId, agentId, roomStatus }: { channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<boolean> {
     const updatedAt = new Date();
     const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
@@ -191,7 +192,6 @@ export async function assignAgentTx({ channelId, agentId, roomStatus }: { channe
                 .from(TbRooms)
                 .where(and(eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
                 .orderBy(asc(TbRooms.createdAt))
-                .limit(1)
                 .for("update");
 
             if (!selectedRoom) {
@@ -208,10 +208,14 @@ export async function assignAgentTx({ channelId, agentId, roomStatus }: { channe
                 .where(and(eq(TbRooms.id, selectedRoom.id), eq(TbRooms.channelId, selectedRoom.channelId), ne(TbRooms.status, roomStatus), isNull(TbRooms.agentId)))
                 .returning();
 
-            return !!assigned;
+            if (assigned) {
+                const res = await assignAgent({ roomId: selectedRoom.id, agentId });
+
+                return !!res;
+            }
         });
 
-        return assignedRoom;
+        return assignedRoom as boolean;
     } catch (error) {
         console.error(error);
         throw error;

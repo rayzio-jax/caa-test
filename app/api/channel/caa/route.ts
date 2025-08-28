@@ -34,10 +34,7 @@ export async function POST(req: Request) {
 
             console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.id}`);
 
-            const assignedRoom = await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-            if (assignedRoom) {
-                await assignAgent({ roomId: room.id, agentId: candidateAgent.id });
-            }
+            await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
         }
         return NextResponse.json({ status: 200, message: `success inserted room ${room_id}`, payload: {} }, { status: 200 });
     } catch (error: any) {

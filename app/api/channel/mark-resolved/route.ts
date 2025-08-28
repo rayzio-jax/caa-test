@@ -31,10 +31,7 @@ export async function POST(req: Request) {
 
             console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.id}`);
 
-            const assignedRoom = await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-            if (assignedRoom) {
-                await assignAgent({ roomId: room.id, agentId: candidateAgent.id });
-            }
+            await assignAgentTx({ channelId: room.channelId, agentId: candidateAgent.id, roomStatus: "HANDLED" });
         }
 
         console.log(`✓ Room ${room_id} has resolved by ${agent_id}/${agent_name}`);
