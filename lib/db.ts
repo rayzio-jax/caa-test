@@ -5,10 +5,7 @@ import appConfig from "./config";
 // Tune Neon connection pool
 const pool = new Pool({
     connectionString: appConfig.dbUrl,
-    max: 30, // Increased for bulk load
-    min: 5,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 3000, // Slightly increased
+    idleTimeoutMillis: 15000,
     maxUses: 7500,
     statement_timeout: 10000, // Increased for resilience
 });
