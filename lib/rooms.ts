@@ -80,24 +80,33 @@ export async function getHandledRooms(agentId: number) {
  * @param {Object} params - Parameters object.
  * @param {string} params.roomId - Customer room id.
  * @param {string} params.channelId - Qiscus channel id.
- * @returns {Promise<Rooms>} Return values of inserted room.
+ * @returns {Promise<boolean>} Return boolean.
  */
 
-export async function addNewRoom({ roomId, channelId }: { roomId: number; channelId: number }): Promise<Room[]> {
+export async function addNewRoom({ roomId, channelId }: { roomId: number; channelId: number }): Promise<boolean> {
     try {
-        const inserted = await db
-            .insert(TbRooms)
-            .values({
-                room_id: roomId,
-                channel_id: channelId,
-            })
-            .returning()
-            .catch((err) => {
-                console.error("Failed adding new room to database. Missing required values or internal error.");
-                throw err;
-            });
+        const inserted = await db.transaction(async (tx) => {
+            const [existing] = await tx
+                .select()
+                .from(TbRooms)
+                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)));
 
-        return parseStringify(inserted) as Room[];
+            if (existing) {
+                return false;
+            }
+
+            const [room] = await tx
+                .insert(TbRooms)
+                .values({
+                    room_id: roomId,
+                    channel_id: channelId,
+                })
+                .returning();
+
+            return room ? true : false;
+        });
+
+        return inserted;
     } catch (error) {
         console.error(error);
         throw error;
@@ -105,31 +114,44 @@ export async function addNewRoom({ roomId, channelId }: { roomId: number; channe
 }
 
 /**
- * Update room data based on room id and channel id
+ * Marked room as resolved using transaction lock
  *
- * @param {Object} params - Parameters object.
- * @param {number} params.roomId - Targetted room id
- * @param {number} params.channelId - Targetted channel id
- * @param {number} params.agentId - The agent that will be assigned
- * @param {status} params.roomStatus - The room waiting status.
- * @returns {Promise<Rooms[]>} Return values of the updated room.
+ * @param {number} roomId - Room id.
+ * @param {number} channelId - Room channel id.
+ * @param {number} agentId - Agent id.
+ * @param {status} roomStatus - The room waiting status.
+ * @returns {Promise<boolean>} Return values of the updated room.
  */
 
-export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
+export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<boolean> {
     const updated_at = new Date();
 
     try {
-        const room = await db
-            .update(TbRooms)
-            .set({
-                agent_id: agentId,
-                status: roomStatus,
-                updated_at,
-            })
-            .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId), ne(TbRooms.status, roomStatus)))
-            .returning();
+        const markedRoom = await db.transaction(async (tx) => {
+            const [selected] = await tx
+                .select()
+                .from(TbRooms)
+                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)))
+                .for("update");
 
-        return parseStringify(room) as Room[];
+            if (!selected) {
+                return false;
+            }
+
+            const marked = await tx
+                .update(TbRooms)
+                .set({
+                    status: roomStatus,
+                    agent_id: agentId,
+                    updated_at,
+                })
+                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)))
+                .returning();
+
+            return marked ? true : false;
+        });
+
+        return markedRoom;
     } catch (error) {
         console.error(error);
         throw error;
@@ -139,32 +161,38 @@ export async function updateRoom({ roomId, channelId, agentId, roomStatus }: { r
 /**
  * Assign agent to a room through transaction lock
  *
- * @param {Array} rooms - Array of rooms.
+ * @param {number} roomId - Room id.
+ * @param {number} channelId - Room channel id.
+ * @param {number} agentId - Agent id.
  * @param {status} roomStatus - The room waiting status.
- * @returns {Promise<Rooms[]>} Return values of the updated room.
+ * @returns {Promise<boolean>} Return values of the updated room.
  */
 
-export async function updateRoomTransaction({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room[]> {
+export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
     const updated_at = new Date();
 
     try {
-        const updatedRooms = await db.transaction(async (tx) => {
+        const assignedRoom = await db.transaction(async (tx) => {
             const [availableRooms] = await tx
                 .select({ count: count() })
                 .from(TbRooms)
                 .where(and(eq(TbRooms.agent_id, agentId), eq(TbRooms.status, "HANDLED")));
 
-            if (availableRooms.count >= appConfig.agentMaxCustomer) {
-                throw new Error("NO_AVAILABLE_ROOM");
+            if (availableRooms.count > appConfig.agentMaxCustomer) {
+                return false;
             }
 
             const [selectedRoom] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId)))
+                .where(and(eq(TbRooms.room_id, roomId), eq(TbRooms.channel_id, channelId), eq(TbRooms.status, "QUEUE")))
                 .for("update");
 
-            const updated = await tx
+            if (!selectedRoom) {
+                return false;
+            }
+
+            const [assigned] = await tx
                 .update(TbRooms)
                 .set({
                     agent_id: agentId,
@@ -174,10 +202,10 @@ export async function updateRoomTransaction({ roomId, channelId, agentId, roomSt
                 .where(and(eq(TbRooms.room_id, selectedRoom.room_id), eq(TbRooms.channel_id, selectedRoom.channel_id), ne(TbRooms.status, roomStatus), isNull(TbRooms.agent_id)))
                 .returning();
 
-            return updated;
+            return assigned ? true : false;
         });
 
-        return parseStringify(updatedRooms) as Room[];
+        return assignedRoom;
     } catch (error) {
         console.error(error);
         throw error;
