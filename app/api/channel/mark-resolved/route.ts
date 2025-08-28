@@ -16,31 +16,26 @@ export async function POST(req: Request) {
             throw new Error(`Failed to mark as resolve room ${room_id}`);
         }
 
-        setTimeout(async () => {
-            const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
+        const queueRooms: Room[] = await getQueueRoomsByChannelId(channel_id);
 
-            for (const room of queueRooms) {
-                const {
-                    agents: [candidateAgent],
-                    count: agentCount,
-                } = await getFilteredAgents();
+        for (const room of queueRooms) {
+            const {
+                agents: [candidateAgent],
+                count: agentCount,
+            } = await getFilteredAgents();
 
-                if (!candidateAgent || agentCount === 0) {
-                    console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
-                    return false;
-                }
-
-                console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
-
-                const assignedRoom = await assignAgentTx({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
-                if (assignedRoom) {
-                    const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
-                    if (res) {
-                        return NextResponse.json({ status: 200, message: `success inserted room ${room_id}`, payload: {} }, { status: 200 });
-                    }
-                }
+            if (!candidateAgent || agentCount === 0) {
+                console.log(`⚠︎ No available agents to handle room ${room.room_id}`);
+                return false;
             }
-        }, 5000);
+
+            console.log(`👤 Found agent ${candidateAgent.id}/${candidateAgent.name} for room ${room.room_id}`);
+
+            const assignedRoom = await assignAgentTx({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
+            if (assignedRoom) {
+                await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
+            }
+        }
 
         console.log(`✓ Room ${room_id} has resolved by ${agent_id}/${agent_name}`);
         return NextResponse.json({ status: 200, message: `success resolved room ${room_id} by ${agent_id}`, payload: {} }, { status: 200 });

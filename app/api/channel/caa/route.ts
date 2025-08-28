@@ -36,12 +36,10 @@ export async function POST(req: Request) {
 
             const assignedRoom = await assignAgentTx({ roomId: room.room_id, channelId: room.channel_id, agentId: candidateAgent.id, roomStatus: "HANDLED" });
             if (assignedRoom) {
-                const res = await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
-                if (res) {
-                    return NextResponse.json({ status: 200, message: `success inserted room ${room_id}`, payload: {} }, { status: 200 });
-                }
+                await assignAgent({ roomId: room.room_id, agentId: candidateAgent.id });
             }
         }
+        return NextResponse.json({ status: 200, message: `success inserted room ${room_id}`, payload: {} }, { status: 200 });
     } catch (error: any) {
         console.error(error, "Internal database error");
         return NextResponse.json({ errors: { message: "internal server error, please check server config" } }, { status: 500 });
