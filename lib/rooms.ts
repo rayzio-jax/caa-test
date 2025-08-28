@@ -34,7 +34,7 @@ export async function getRooms(): Promise<Room[]> {
  * @param {string} channelId - The chat room channel id
  * @returns {Promise<Room[]>} List of on-queue rooms
  */
-export async function getQueueRoomsByChannelId(channelId: number): Promise<Room[]> {
+export async function getRoomsByChannel(channelId: number): Promise<Room[]> {
     try {
         const rooms = await db
             .select()
@@ -169,7 +169,7 @@ export async function markResolveTx({ roomId, channelId, agentId, roomStatus }: 
  * @returns {Promise<boolean>} Return values of the updated room.
  */
 
-export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: { roomId: number; channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
+export async function assignAgentTx({ channelId, agentId, roomStatus }: { channelId: number; agentId: number; roomStatus: Room["status"] }): Promise<Room | boolean> {
     const updatedAt = new Date();
     const MAX_CUSTOMER = appConfig.agentMaxCustomer;
 
@@ -189,7 +189,9 @@ export async function assignAgentTx({ roomId, channelId, agentId, roomStatus }: 
             const [selectedRoom] = await tx
                 .select()
                 .from(TbRooms)
-                .where(and(eq(TbRooms.id, roomId), eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
+                .where(and(eq(TbRooms.channelId, channelId), eq(TbRooms.status, "QUEUE")))
+                .orderBy(asc(TbRooms.createdAt))
+                .limit(1)
                 .for("update");
 
             if (!selectedRoom) {
